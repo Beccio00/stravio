@@ -1,0 +1,25 @@
+{
+  "name": "@bhmt3wp/backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate"
+  },
+  "dependencies": {
+    "@bhmt3wp/shared": "*",
+    "fastify": "^5.2.0",
+    "@fastify/cors": "^11.0.0",
+    "drizzle-orm": "^0.38.0",
+    "@libsql/client": "^0.14.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "drizzle-kit": "^0.30.0",
+    "typescript": "^5.7.0"
+  }
+}

@@ -1,0 +1,169 @@
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "./client";
+import type {
+  CreateWorkoutSheetInput,
+  UpdateWorkoutSheetInput,
+  CreateExerciseInput,
+  UpdateExerciseInput,
+  CreateExerciseSetInput,
+  UpdateExerciseSetInput,
+  CreateWorkoutSessionInput,
+  CreateSessionSetLogInput,
+} from "@bhmt3wp/shared";
+
+// ==================== SHEETS ====================
+
+export function useSheets() {
+  return useQuery({
+    queryKey: ["sheets"],
+    queryFn: () => api.sheets.list(),
+  });
+}
+
+export function useSheet(id: number) {
+  return useQuery({
+    queryKey: ["sheets", id],
+    queryFn: () => api.sheets.get(id),
+    enabled: !!id,
+  });
+}
+
+export function useCreateSheet() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CreateWorkoutSheetInput) => api.sheets.create(data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["sheets"] }),
+  });
+}
+
+export function useUpdateSheet() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: UpdateWorkoutSheetInput & { id: number }) =>
+      api.sheets.update(id, data),
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["sheets"] });
+      qc.invalidateQueries({ queryKey: ["sheets", vars.id] });
+    },
+  });
+}
+
+export function useDeleteSheet() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.sheets.delete(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["sheets"] }),
+  });
+}
+
+// ==================== EXERCISES ====================
+
+export function useCreateExercise() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CreateExerciseInput) => api.exercises.create(data),
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["sheets", vars.sheetId] });
+    },
+  });
+}
+
+export function useUpdateExercise(sheetId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: UpdateExerciseInput & { id: number }) =>
+      api.exercises.update(id, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["sheets", sheetId] });
+    },
+  });
+}
+
+export function useDeleteExercise(sheetId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.exercises.delete(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["sheets", sheetId] });
+    },
+  });
+}
+
+// ==================== SETS ====================
+
+export function useCreateSet(sheetId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CreateExerciseSetInput) => api.sets.create(data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["sheets", sheetId] });
+    },
+  });
+}
+
+export function useUpdateSet(sheetId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: UpdateExerciseSetInput & { id: number }) =>
+      api.sets.update(id, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["sheets", sheetId] });
+    },
+  });
+}
+
+export function useDeleteSet(sheetId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.sets.delete(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["sheets", sheetId] });
+    },
+  });
+}
+
+// ==================== SESSIONS ====================
+
+export function useSessions() {
+  return useQuery({
+    queryKey: ["sessions"],
+    queryFn: () => api.sessions.list(),
+  });
+}
+
+export function useSession(id: number) {
+  return useQuery({
+    queryKey: ["sessions", id],
+    queryFn: () => api.sessions.get(id),
+    enabled: !!id,
+  });
+}
+
+export function useCreateSession() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CreateWorkoutSessionInput) => api.sessions.create(data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["sessions"] }),
+  });
+}
+
+export function useCompleteSession() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.sessions.complete(id),
+    onSuccess: (_, id) => {
+      qc.invalidateQueries({ queryKey: ["sessions"] });
+      qc.invalidateQueries({ queryKey: ["sessions", id] });
+    },
+  });
+}
+
+export function useLogSessionSet() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CreateSessionSetLogInput) => api.sessions.logSet(data),
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["sessions", vars.sessionId] });
+    },
+  });
+}

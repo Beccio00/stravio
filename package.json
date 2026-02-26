@@ -1,0 +1,19 @@
+{
+  "name": "bhmt3wp",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:backend": "npm run dev -w apps/backend",
+    "dev:mobile": "npm run dev -w apps/mobile",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:mobile\"",
+    "db:generate": "npm run db:generate -w apps/backend",
+    "db:migrate": "npm run db:migrate -w apps/backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "typescript": "^5.7.0"
+  }
+}
