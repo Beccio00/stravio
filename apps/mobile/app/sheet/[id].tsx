@@ -5,6 +5,7 @@ import {
   ScrollView,
   TextInput,
   Alert,
+  Platform,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -53,10 +54,16 @@ export default function SheetDetailScreen() {
   };
 
   const handleDeleteExercise = (exId: number, name: string) => {
-    Alert.alert("Elimina esercizio", `Vuoi eliminare "${name}"?`, [
-      { text: "Annulla", style: "cancel" },
-      { text: "Elimina", style: "destructive", onPress: () => deleteExercise.mutate(exId) },
-    ]);
+    if (Platform.OS === "web") {
+      if (window.confirm(`Vuoi eliminare "${name}"?`)) {
+        deleteExercise.mutate(exId);
+      }
+    } else {
+      Alert.alert("Elimina esercizio", `Vuoi eliminare "${name}"?`, [
+        { text: "Annulla", style: "cancel" },
+        { text: "Elimina", style: "destructive", onPress: () => deleteExercise.mutate(exId) },
+      ]);
+    }
   };
 
   const handleAddSet = (exerciseId: number, currentSets: ExerciseSet[]) => {

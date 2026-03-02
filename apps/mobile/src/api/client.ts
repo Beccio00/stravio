@@ -1,4 +1,5 @@
 import { Platform } from "react-native";
+import Constants from "expo-constants";
 import type {
   WorkoutSheet,
   WorkoutSheetFull,
@@ -17,24 +18,41 @@ import type {
   ApiResponse,
 } from "@bhmt3wp/shared";
 
-// On Android emulator, localhost maps to 10.0.2.2
-// On physical device, use your computer's local IP
+// Detect the backend URL automatically:
+// - On web: same hostname as the page, port 3000
+// - On native: use the Expo dev server hostname (your PC's IP), port 3000
 const getBaseUrl = () => {
-  if (Platform.OS === "android") {
-    return "http://10.0.2.2:3000";
+  if (Platform.OS === "web") {
+    // In the browser, use the same host
+    const host = typeof window !== "undefined" ? window.location.hostname : "localhost";
+    return `http://${host}:3000`;
   }
+  // On native (phone/emulator), Expo tells us the dev server IP
+  const debuggerHost =
+    Constants.expoConfig?.hostUri ?? Constants.manifest2?.extra?.expoGo?.debuggerHost;
+  if (debuggerHost) {
+    const host = debuggerHost.split(":")[0];
+    return `http://${host}:3000`;
+  }
+  // Fallback
   return "http://localhost:3000";
 };
 
 const BASE_URL = getBaseUrl();
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = {
+    ...((options?.headers as Record<string, string>) || {}),
+  };
+
+  // Only set Content-Type for requests with a body
+  if (options?.body) {
+    headers["Content-Type"] = "application/json";
+  }
+
   const res = await fetch(`${BASE_URL}${path}`, {
     ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options?.headers,
-    },
+    headers,
   });
 
   if (!res.ok) {

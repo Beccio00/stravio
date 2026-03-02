@@ -14,6 +14,7 @@ async function start() {
   // CORS - allow requests from Expo dev server and web
   await app.register(cors, {
     origin: true,
+    methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
   });
 
   // Run DB migrations on start

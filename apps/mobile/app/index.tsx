@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, FlatList, TextInput, Alert } from "react-native";
+import { View, Text, TouchableOpacity, FlatList, TextInput, Alert, Platform } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSheets, useCreateSheet, useDeleteSheet } from "../src/api/hooks";
@@ -27,14 +27,20 @@ export default function HomeScreen() {
   };
 
   const handleDelete = (id: number, name: string) => {
-    Alert.alert("Elimina scheda", `Vuoi eliminare "${name}"?`, [
-      { text: "Annulla", style: "cancel" },
-      {
-        text: "Elimina",
-        style: "destructive",
-        onPress: () => deleteSheet.mutate(id),
-      },
-    ]);
+    if (Platform.OS === "web") {
+      if (window.confirm(`Vuoi eliminare "${name}"?`)) {
+        deleteSheet.mutate(id);
+      }
+    } else {
+      Alert.alert("Elimina scheda", `Vuoi eliminare "${name}"?`, [
+        { text: "Annulla", style: "cancel" },
+        {
+          text: "Elimina",
+          style: "destructive",
+          onPress: () => deleteSheet.mutate(id),
+        },
+      ]);
+    }
   };
 
   const renderSheet = ({ item }: { item: WorkoutSheet }) => (

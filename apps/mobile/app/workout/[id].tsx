@@ -1,9 +1,23 @@
-import { View, Text, TouchableOpacity, ScrollView, Alert } from "react-native";
+import { View, Text, TouchableOpacity, ScrollView, Alert, TextInput, Platform } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSheet, useSession, useLogSessionSet, useCompleteSession } from "../../src/api/hooks";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect } from "react";
 import type { ExerciseFull, ExerciseSet } from "@bhmt3wp/shared";
+
+// Cross-platform confirm (Alert.alert doesn't work on web)
+function confirmAction(title: string, message: string, onConfirm: () => void) {
+  if (Platform.OS === "web") {
+    if (window.confirm(`${title}\n${message}`)) {
+      onConfirm();
+    }
+  } else {
+    Alert.alert(title, message, [
+      { text: "Annulla", style: "cancel" },
+      { text: "Conferma", onPress: onConfirm },
+    ]);
+  }
+}
 
 export default function WorkoutScreen() {
   const { id, sheetId } = useLocalSearchParams<{ id: string; sheetId: string }>();
@@ -14,50 +28,89 @@ export default function WorkoutScreen() {
   const logSet = useLogSessionSet();
   const completeSession = useCompleteSession();
 
-  // Track which sets have been completed
+  // Track completed sets and their actual values
   const [completedSets, setCompletedSets] = useState<Set<string>>(new Set());
-  const [activeRestTimer, setActiveRestTimer] = useState<number | null>(null);
+  // Editable values per set: key = "exerciseId-setNumber"
+  const [editValues, setEditValues] = useState<Record<string, { kg: string; reps: string }>>({});
   const [restTimeLeft, setRestTimeLeft] = useState(0);
+
+  // Initialize editable values from sheet template
+  useEffect(() => {
+    if (!sheet) return;
+    const initial: Record<string, { kg: string; reps: string }> = {};
+    for (const ex of sheet.exercises) {
+      for (const set of ex.sets) {
+        const key = `${ex.id}-${set.setNumber}`;
+        if (!editValues[key]) {
+          initial[key] = {
+            kg: set.weightKg.toString(),
+            reps: set.reps.toString(),
+          };
+        }
+      }
+    }
+    if (Object.keys(initial).length > 0) {
+      setEditValues((prev) => ({ ...initial, ...prev }));
+    }
+  }, [sheet]);
 
   // Rest timer
   useEffect(() => {
-    if (restTimeLeft <= 0) {
-      setActiveRestTimer(null);
-      return;
-    }
+    if (restTimeLeft <= 0) return;
     const timer = setTimeout(() => setRestTimeLeft((t) => t - 1), 1000);
     return () => clearTimeout(timer);
   }, [restTimeLeft]);
+
+  const getEditValue = (exerciseId: number, setNumber: number) => {
+    const key = `${exerciseId}-${setNumber}`;
+    return editValues[key];
+  };
+
+  const updateEditValue = (exerciseId: number, setNumber: number, field: "kg" | "reps", value: string) => {
+    const key = `${exerciseId}-${setNumber}`;
+    setEditValues((prev) => ({
+      ...prev,
+      [key]: { ...prev[key], [field]: value },
+    }));
+  };
 
   const handleCompleteSet = (exercise: ExerciseFull, set: ExerciseSet) => {
     const key = `${exercise.id}-${set.setNumber}`;
     if (completedSets.has(key)) return;
 
+    const values = editValues[key] || { kg: set.weightKg.toString(), reps: set.reps.toString() };
+    const actualKg = parseFloat(values.kg) || 0;
+    const actualReps = parseInt(values.reps) || 0;
+
     logSet.mutate({
       sessionId,
       exerciseId: exercise.id,
       setNumber: set.setNumber,
-      reps: set.reps,
-      weightKg: set.weightKg,
+      reps: actualReps,
+      weightKg: actualKg,
     });
 
     setCompletedSets((prev) => new Set(prev).add(key));
-    setActiveRestTimer(set.id);
     setRestTimeLeft(set.restTimeSec);
   };
 
   const handleFinishWorkout = () => {
-    Alert.alert("Completa Allenamento", "Vuoi terminare l'allenamento?", [
-      { text: "Continua", style: "cancel" },
-      {
-        text: "Completa",
-        onPress: () => {
-          completeSession.mutate(sessionId, {
-            onSuccess: () => router.replace("/"),
-          });
-        },
-      },
-    ]);
+    confirmAction("Completa Allenamento", "Vuoi terminare l'allenamento?", async () => {
+      try {
+        console.log("Completing session:", sessionId);
+        await completeSession.mutateAsync(sessionId);
+        console.log("Session completed, navigating home");
+        router.replace("/");
+      } catch (e: any) {
+        const msg = e?.message || String(e);
+        console.error("Failed to complete session:", msg);
+        if (Platform.OS === "web") {
+          window.alert("Errore: " + msg);
+        } else {
+          Alert.alert("Errore", msg);
+        }
+      }
+    });
   };
 
   if (!sheet) {
@@ -130,18 +183,46 @@ export default function WorkoutScreen() {
             {exercise.sets.map((set) => {
               const key = `${exercise.id}-${set.setNumber}`;
               const isDone = completedSets.has(key);
+              const vals = getEditValue(exercise.id, set.setNumber);
 
               return (
                 <View key={set.id} className="flex-row items-center mb-2 px-1">
                   <Text className="text-text-secondary text-sm w-10 font-semibold">
                     {set.setNumber}
                   </Text>
-                  <Text className="text-text-primary text-sm flex-1 text-center">
-                    {set.weightKg} kg
-                  </Text>
-                  <Text className="text-text-primary text-sm flex-1 text-center">
-                    {set.reps}
-                  </Text>
+
+                  {/* Editable KG */}
+                  <View className="flex-1 mx-1">
+                    <TextInput
+                      className={`text-center rounded-lg px-2 py-1 text-sm border ${
+                        isDone
+                          ? "bg-accent/10 border-accent/30 text-accent"
+                          : "bg-surface-light border-border text-text-primary"
+                      }`}
+                      value={vals?.kg ?? set.weightKg.toString()}
+                      onChangeText={(v) => updateEditValue(exercise.id, set.setNumber, "kg", v)}
+                      keyboardType="numeric"
+                      editable={!isDone}
+                      selectTextOnFocus
+                    />
+                  </View>
+
+                  {/* Editable REPS */}
+                  <View className="flex-1 mx-1">
+                    <TextInput
+                      className={`text-center rounded-lg px-2 py-1 text-sm border ${
+                        isDone
+                          ? "bg-accent/10 border-accent/30 text-accent"
+                          : "bg-surface-light border-border text-text-primary"
+                      }`}
+                      value={vals?.reps ?? set.reps.toString()}
+                      onChangeText={(v) => updateEditValue(exercise.id, set.setNumber, "reps", v)}
+                      keyboardType="numeric"
+                      editable={!isDone}
+                      selectTextOnFocus
+                    />
+                  </View>
+
                   <TouchableOpacity
                     className={`w-20 py-2 rounded-xl items-center ${
                       isDone ? "bg-accent/20" : "bg-primary"
