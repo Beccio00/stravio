@@ -1,9 +1,9 @@
 import { View, Text, TouchableOpacity, ScrollView, Alert, TextInput, Platform } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useSheet, useSession, useLogSessionSet, useCompleteSession } from "../../src/api/hooks";
-import { useState, useEffect } from "react";
-import type { ExerciseFull, ExerciseSet } from "@bhmt3wp/shared";
+import { useSheet, useSession, useLogSessionSet, useCompleteSession, useLastSessionBySheet, useUpdateSet } from "../../src/api/hooks";
+import { useState, useEffect, useMemo } from "react";
+import type { ExerciseFull, ExerciseSet, SessionSetLog } from "@bhmt3wp/shared";
 
 // Cross-platform confirm (Alert.alert doesn't work on web)
 function confirmAction(title: string, message: string, onConfirm: () => void) {
@@ -13,8 +13,8 @@ function confirmAction(title: string, message: string, onConfirm: () => void) {
     }
   } else {
     Alert.alert(title, message, [
-      { text: "Annulla", style: "cancel" },
-      { text: "Conferma", onPress: onConfirm },
+      { text: "Cancel", style: "cancel" },
+      { text: "Confirm", onPress: onConfirm },
     ]);
   }
 }
@@ -27,6 +27,19 @@ export default function WorkoutScreen() {
   const { data: session } = useSession(sessionId);
   const logSet = useLogSessionSet();
   const completeSession = useCompleteSession();
+  const updateSet = useUpdateSet(parseInt(sheetId!));
+  const { data: lastSessionData } = useLastSessionBySheet(parseInt(sheetId!));
+
+  // Build lookup: "exerciseId-setNumber" → previous log
+  const prevLogs = useMemo(() => {
+    const map: Record<string, SessionSetLog> = {};
+    if (lastSessionData?.logs) {
+      for (const log of lastSessionData.logs) {
+        map[`${log.exerciseId}-${log.setNumber}`] = log;
+      }
+    }
+    return map;
+  }, [lastSessionData]);
 
   // Track completed sets and their actual values
   const [completedSets, setCompletedSets] = useState<Set<string>>(new Set());
@@ -90,24 +103,33 @@ export default function WorkoutScreen() {
       weightKg: actualKg,
     });
 
+    // Sync KG change back to the sheet template (reps stay session-only)
+    if (actualKg !== set.weightKg) {
+      updateSet.mutate({ id: set.id, weightKg: actualKg });
+    }
+
     setCompletedSets((prev) => new Set(prev).add(key));
     setRestTimeLeft(set.restTimeSec);
   };
 
   const handleFinishWorkout = () => {
-    confirmAction("Completa Allenamento", "Vuoi terminare l'allenamento?", async () => {
+    confirmAction("Complete Workout", "Do you want to finish the workout?", async () => {
       try {
         console.log("Completing session:", sessionId);
         await completeSession.mutateAsync(sessionId);
         console.log("Session completed, navigating home");
+        // Dismiss all intermediate screens (sheet) then replace with root
+        if (router.canDismiss()) {
+          router.dismissAll();
+        }
         router.replace("/");
       } catch (e: any) {
         const msg = e?.message || String(e);
         console.error("Failed to complete session:", msg);
         if (Platform.OS === "web") {
-          window.alert("Errore: " + msg);
+          window.alert("Error: " + msg);
         } else {
-          Alert.alert("Errore", msg);
+          Alert.alert("Error", msg);
         }
       }
     });
@@ -116,7 +138,7 @@ export default function WorkoutScreen() {
   if (!sheet) {
     return (
       <SafeAreaView className="flex-1 bg-background items-center justify-center">
-        <Text className="text-text-secondary text-lg">Caricamento...</Text>
+        <Text className="text-text-secondary text-lg">Loading...</Text>
       </SafeAreaView>
     );
   }
@@ -131,14 +153,14 @@ export default function WorkoutScreen() {
       <View className="px-5 pt-4 pb-3">
         <View className="flex-row items-center justify-between">
           <View>
-            <Text className="text-accent text-sm font-semibold uppercase">Allenamento in corso</Text>
+            <Text className="text-accent text-sm font-semibold uppercase">Workout in progress</Text>
             <Text className="text-text-primary text-xl font-bold">{sheet.name}</Text>
           </View>
           <TouchableOpacity
             className="bg-danger px-4 py-2 rounded-xl"
             onPress={handleFinishWorkout}
           >
-            <Text className="text-white font-bold">Finisci</Text>
+            <Text className="text-white font-bold">Finish</Text>
           </TouchableOpacity>
         </View>
 
@@ -150,19 +172,19 @@ export default function WorkoutScreen() {
           />
         </View>
         <Text className="text-text-muted text-xs mt-1">
-          {completedCount}/{totalSets} set completati
+          {completedCount}/{totalSets} sets completed
         </Text>
       </View>
 
       {/* Rest Timer */}
       {restTimeLeft > 0 && (
         <View className="mx-5 bg-primary/20 rounded-2xl p-4 mb-3 items-center">
-          <Text className="text-primary-light text-sm font-semibold">RIPOSO</Text>
+          <Text className="text-primary-light text-sm font-semibold">REST</Text>
           <Text className="text-text-primary text-4xl font-bold">
             {Math.floor(restTimeLeft / 60)}:{(restTimeLeft % 60).toString().padStart(2, "0")}
           </Text>
           <TouchableOpacity onPress={() => setRestTimeLeft(0)} className="mt-2">
-            <Text className="text-primary text-sm">Salta →</Text>
+            <Text className="text-primary text-sm">Skip →</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -184,60 +206,70 @@ export default function WorkoutScreen() {
               const key = `${exercise.id}-${set.setNumber}`;
               const isDone = completedSets.has(key);
               const vals = getEditValue(exercise.id, set.setNumber);
+              const prev = prevLogs[key];
 
               return (
-                <View key={set.id} className="flex-row items-center mb-2 px-1">
-                  <Text className="text-text-secondary text-sm w-10 font-semibold">
-                    {set.setNumber}
-                  </Text>
-
-                  {/* Editable KG */}
-                  <View className="flex-1 mx-1">
-                    <TextInput
-                      className={`text-center rounded-lg px-2 py-1 text-sm border ${
-                        isDone
-                          ? "bg-accent/10 border-accent/30 text-accent"
-                          : "bg-surface-light border-border text-text-primary"
-                      }`}
-                      value={vals?.kg ?? set.weightKg.toString()}
-                      onChangeText={(v) => updateEditValue(exercise.id, set.setNumber, "kg", v)}
-                      keyboardType="numeric"
-                      editable={!isDone}
-                      selectTextOnFocus
-                    />
-                  </View>
-
-                  {/* Editable REPS */}
-                  <View className="flex-1 mx-1">
-                    <TextInput
-                      className={`text-center rounded-lg px-2 py-1 text-sm border ${
-                        isDone
-                          ? "bg-accent/10 border-accent/30 text-accent"
-                          : "bg-surface-light border-border text-text-primary"
-                      }`}
-                      value={vals?.reps ?? set.reps.toString()}
-                      onChangeText={(v) => updateEditValue(exercise.id, set.setNumber, "reps", v)}
-                      keyboardType="numeric"
-                      editable={!isDone}
-                      selectTextOnFocus
-                    />
-                  </View>
-
-                  <TouchableOpacity
-                    className={`w-20 py-2 rounded-xl items-center ${
-                      isDone ? "bg-accent/20" : "bg-primary"
-                    }`}
-                    onPress={() => handleCompleteSet(exercise, set)}
-                    disabled={isDone}
-                  >
-                    <Text
-                      className={`font-semibold text-sm ${
-                        isDone ? "text-accent" : "text-white"
-                      }`}
-                    >
-                      {isDone ? "✓ Fatto" : "Fatto"}
+                <View key={set.id} className="mb-2 px-1">
+                  <View className="flex-row items-center">
+                    <Text className="text-text-secondary text-sm w-10 font-semibold">
+                      {set.setNumber}
                     </Text>
-                  </TouchableOpacity>
+
+                    {/* Editable KG */}
+                    <View className="flex-1 mx-1">
+                      <TextInput
+                        className={`text-center rounded-lg px-2 py-1 text-sm border ${
+                          isDone
+                            ? "bg-accent/10 border-accent/30 text-accent"
+                            : "bg-surface-light border-border text-text-primary"
+                        }`}
+                        value={vals?.kg ?? set.weightKg.toString()}
+                        onChangeText={(v) => updateEditValue(exercise.id, set.setNumber, "kg", v)}
+                        keyboardType="numeric"
+                        editable={!isDone}
+                        selectTextOnFocus
+                      />
+                    </View>
+
+                    {/* Editable REPS */}
+                    <View className="flex-1 mx-1">
+                      <TextInput
+                        className={`text-center rounded-lg px-2 py-1 text-sm border ${
+                          isDone
+                            ? "bg-accent/10 border-accent/30 text-accent"
+                            : "bg-surface-light border-border text-text-primary"
+                        }`}
+                        value={vals?.reps ?? set.reps.toString()}
+                        onChangeText={(v) => updateEditValue(exercise.id, set.setNumber, "reps", v)}
+                        keyboardType="numeric"
+                        editable={!isDone}
+                        selectTextOnFocus
+                      />
+                    </View>
+
+                    <TouchableOpacity
+                      className={`w-20 py-2 rounded-xl items-center ${
+                        isDone ? "bg-accent/20" : "bg-primary"
+                      }`}
+                      onPress={() => handleCompleteSet(exercise, set)}
+                      disabled={isDone}
+                    >
+                      <Text
+                        className={`font-semibold text-sm ${
+                          isDone ? "text-accent" : "text-white"
+                        }`}
+                      >
+                        {isDone ? "✓ Done" : "Done"}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Previous session hint */}
+                  {prev && (
+                    <Text className="text-text-muted text-xs ml-10 mt-0.5">
+                      last time: {prev.weightKg}kg × {prev.reps}
+                    </Text>
+                  )}
                 </View>
               );
             })}

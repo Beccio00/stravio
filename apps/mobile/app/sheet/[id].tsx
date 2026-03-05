@@ -55,13 +55,13 @@ export default function SheetDetailScreen() {
 
   const handleDeleteExercise = (exId: number, name: string) => {
     if (Platform.OS === "web") {
-      if (window.confirm(`Vuoi eliminare "${name}"?`)) {
+      if (window.confirm(`Delete "${name}"?`)) {
         deleteExercise.mutate(exId);
       }
     } else {
-      Alert.alert("Elimina esercizio", `Vuoi eliminare "${name}"?`, [
-        { text: "Annulla", style: "cancel" },
-        { text: "Elimina", style: "destructive", onPress: () => deleteExercise.mutate(exId) },
+      Alert.alert("Delete exercise", `Delete "${name}"?`, [
+        { text: "Cancel", style: "cancel" },
+        { text: "Delete", style: "destructive", onPress: () => deleteExercise.mutate(exId) },
       ]);
     }
   };
@@ -92,7 +92,7 @@ export default function SheetDetailScreen() {
   if (isLoading) {
     return (
       <SafeAreaView className="flex-1 bg-background items-center justify-center">
-        <Text className="text-text-secondary text-lg">Caricamento...</Text>
+        <Text className="text-text-secondary text-lg">Loading...</Text>
       </SafeAreaView>
     );
   }
@@ -100,7 +100,7 @@ export default function SheetDetailScreen() {
   if (!sheet) {
     return (
       <SafeAreaView className="flex-1 bg-background items-center justify-center">
-        <Text className="text-danger text-lg">Scheda non trovata</Text>
+        <Text className="text-danger text-lg">Sheet not found</Text>
       </SafeAreaView>
     );
   }
@@ -111,7 +111,7 @@ export default function SheetDetailScreen() {
       <View className="px-5 pt-4 pb-3 flex-row items-center justify-between">
         <View className="flex-1">
           <TouchableOpacity onPress={() => router.back()}>
-            <Text className="text-primary text-base mb-1">← Indietro</Text>
+            <Text className="text-primary text-base mb-1">← Back</Text>
           </TouchableOpacity>
           <Text className="text-text-primary text-2xl font-bold">{sheet.name}</Text>
           {sheet.description && (
@@ -122,7 +122,7 @@ export default function SheetDetailScreen() {
           className="bg-accent px-5 py-3 rounded-xl"
           onPress={handleStartWorkout}
         >
-          <Text className="text-background font-bold text-base">▶ Inizia</Text>
+          <Text className="text-background font-bold text-base">▶ Start</Text>
         </TouchableOpacity>
       </View>
 
@@ -143,7 +143,7 @@ export default function SheetDetailScreen() {
           <View className="bg-surface rounded-2xl p-4 mb-3 border border-border">
             <TextInput
               className="bg-background text-text-primary rounded-xl px-4 py-3 text-base border border-border mb-3"
-              placeholder="Nome esercizio..."
+            placeholder="Exercise name..."
               placeholderTextColor="#6b6b7b"
               value={newExerciseName}
               onChangeText={setNewExerciseName}
@@ -155,13 +155,13 @@ export default function SheetDetailScreen() {
                 className="flex-1 bg-background rounded-xl py-3 items-center"
                 onPress={() => setShowAddExercise(false)}
               >
-                <Text className="text-text-secondary font-semibold">Annulla</Text>
+                <Text className="text-text-secondary font-semibold">Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 className="flex-1 bg-primary rounded-xl py-3 items-center"
                 onPress={handleAddExercise}
               >
-                <Text className="text-white font-semibold">Aggiungi</Text>
+                <Text className="text-white font-semibold">Add</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -170,7 +170,7 @@ export default function SheetDetailScreen() {
             className="bg-surface-light rounded-2xl p-4 mb-3 border border-border border-dashed items-center"
             onPress={() => setShowAddExercise(true)}
           >
-            <Text className="text-primary font-semibold text-base">+ Aggiungi Esercizio</Text>
+            <Text className="text-primary font-semibold text-base">+ Add Exercise</Text>
           </TouchableOpacity>
         )}
       </ScrollView>
@@ -197,7 +197,7 @@ function ExerciseCard({
       <View className="flex-row items-center justify-between mb-3">
         <Text className="text-text-primary text-lg font-bold flex-1">{exercise.name}</Text>
         <TouchableOpacity onPress={onDelete}>
-          <Text className="text-danger text-sm">Elimina</Text>
+          <Text className="text-danger text-sm">Delete</Text>
         </TouchableOpacity>
       </View>
 
@@ -230,7 +230,7 @@ function ExerciseCard({
         className="bg-surface-light rounded-xl py-2 mt-2 items-center"
         onPress={onAddSet}
       >
-        <Text className="text-primary-light font-semibold text-sm">+ Aggiungi Set</Text>
+        <Text className="text-primary-light font-semibold text-sm">+ Add Set</Text>
       </TouchableOpacity>
     </View>
   );
@@ -297,8 +297,8 @@ function SetRow({
       onLongPress={onDelete}
     >
       <Text className="text-text-secondary text-sm w-10 font-semibold">{set.setNumber}</Text>
-      <Text className="text-text-primary text-sm flex-1 text-center">{set.weightKg} kg</Text>
-      <Text className="text-text-primary text-sm flex-1 text-center">{set.reps} reps</Text>
+      <Text className="text-text-primary text-sm flex-1 text-center">{set.weightKg}</Text>
+      <Text className="text-text-primary text-sm flex-1 text-center">{set.reps}</Text>
       <Text className="text-text-muted text-sm flex-1 text-center">{set.restTimeSec}s</Text>
       <View className="w-8" />
     </TouchableOpacity>

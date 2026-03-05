@@ -6,6 +6,8 @@ import type {
   Exercise,
   ExerciseSet,
   WorkoutSession,
+  WorkoutSessionWithSheet,
+  SessionDetailFull,
   CreateWorkoutSheetInput,
   UpdateWorkoutSheetInput,
   CreateExerciseInput,
@@ -120,8 +122,10 @@ export const api = {
   sessions: {
     list: () =>
       request<ApiResponse<WorkoutSession[]>>("/api/sessions").then((r) => r.data),
+    completed: () =>
+      request<ApiResponse<WorkoutSessionWithSheet[]>>("/api/sessions/completed").then((r) => r.data),
     get: (id: number) =>
-      request<ApiResponse<WorkoutSession & { logs: SessionSetLog[] }>>(
+      request<ApiResponse<SessionDetailFull>>(
         `/api/sessions/${id}`
       ).then((r) => r.data),
     create: (data: CreateWorkoutSessionInput) =>
@@ -139,5 +143,9 @@ export const api = {
         method: "POST",
         body: JSON.stringify(data),
       }).then((r) => r.data),
+    lastBySheet: (sheetId: number) =>
+      request<ApiResponse<{ session: WorkoutSession; logs: SessionSetLog[] } | null>>(
+        `/api/sessions/last-by-sheet/${sheetId}`
+      ).then((r) => r.data),
   },
 };

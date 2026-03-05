@@ -154,6 +154,7 @@ export function useCompleteSession() {
     onSuccess: (_, id) => {
       qc.invalidateQueries({ queryKey: ["sessions"] });
       qc.invalidateQueries({ queryKey: ["sessions", id] });
+      qc.invalidateQueries({ queryKey: ["sessions", "completed"] });
     },
   });
 }
@@ -165,5 +166,20 @@ export function useLogSessionSet() {
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ["sessions", vars.sessionId] });
     },
+  });
+}
+
+export function useCompletedSessions() {
+  return useQuery({
+    queryKey: ["sessions", "completed"],
+    queryFn: () => api.sessions.completed(),
+  });
+}
+
+export function useLastSessionBySheet(sheetId: number) {
+  return useQuery({
+    queryKey: ["sessions", "last-by-sheet", sheetId],
+    queryFn: () => api.sessions.lastBySheet(sheetId),
+    enabled: !!sheetId,
   });
 }

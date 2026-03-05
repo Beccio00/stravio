@@ -28,14 +28,14 @@ export default function HomeScreen() {
 
   const handleDelete = (id: number, name: string) => {
     if (Platform.OS === "web") {
-      if (window.confirm(`Vuoi eliminare "${name}"?`)) {
+      if (window.confirm(`Delete "${name}"?`)) {
         deleteSheet.mutate(id);
       }
     } else {
-      Alert.alert("Elimina scheda", `Vuoi eliminare "${name}"?`, [
-        { text: "Annulla", style: "cancel" },
+      Alert.alert("Delete sheet", `Delete "${name}"?`, [
+        { text: "Cancel", style: "cancel" },
         {
-          text: "Elimina",
+          text: "Delete",
           style: "destructive",
           onPress: () => deleteSheet.mutate(id),
         },
@@ -55,7 +55,7 @@ export default function HomeScreen() {
         <Text className="text-text-secondary text-sm mt-1">{item.description}</Text>
       )}
       <Text className="text-text-muted text-xs mt-2">
-        {new Date(item.createdAt).toLocaleDateString("it-IT")}
+        {new Date(item.createdAt).toLocaleDateString("en-US")}
       </Text>
     </TouchableOpacity>
   );
@@ -63,20 +63,30 @@ export default function HomeScreen() {
   return (
     <SafeAreaView className="flex-1 bg-background">
       <View className="px-5 pt-4 pb-2">
-        <Text className="text-text-primary text-3xl font-bold">🏋️ Le Mie Schede</Text>
-        <Text className="text-text-secondary text-base mt-1">
-          Tocca una scheda per visualizzarla, tieni premuto per eliminarla
-        </Text>
+        <View className="flex-row items-center justify-between">
+          <View>
+            <Text className="text-text-primary text-3xl font-bold">🏋️ My Sheets</Text>
+            <Text className="text-text-secondary text-base mt-1">
+              Tap a sheet to view it, long press to delete
+            </Text>
+          </View>
+          <TouchableOpacity
+            className="bg-surface rounded-xl px-4 py-2 border border-border"
+            onPress={() => router.push("/history")}
+          >
+            <Text className="text-primary text-sm font-bold">📅 History</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {isLoading ? (
         <View className="flex-1 items-center justify-center">
-          <Text className="text-text-secondary text-lg">Caricamento...</Text>
+          <Text className="text-text-secondary text-lg">Loading...</Text>
         </View>
       ) : error ? (
         <View className="flex-1 items-center justify-center px-5">
           <Text className="text-danger text-lg text-center">
-            Errore di connessione al server.{"\n"}Assicurati che il backend sia avviato.
+            Server connection error.{"\n"}Make sure the backend is running.
           </Text>
         </View>
       ) : (
@@ -88,7 +98,7 @@ export default function HomeScreen() {
           ListEmptyComponent={
             <View className="items-center justify-center pt-20">
               <Text className="text-text-muted text-lg text-center">
-                Nessuna scheda ancora.{"\n"}Creane una nuova!
+                No sheets yet.{"\n"}Create a new one!
               </Text>
             </View>
           }
@@ -98,10 +108,10 @@ export default function HomeScreen() {
       {/* Create sheet modal/inline */}
       {showCreate && (
         <View className="absolute bottom-24 left-5 right-5 bg-surface-light rounded-2xl p-5 border border-border">
-          <Text className="text-text-primary text-lg font-bold mb-3">Nuova Scheda</Text>
+          <Text className="text-text-primary text-lg font-bold mb-3">New Sheet</Text>
           <TextInput
             className="bg-background text-text-primary rounded-xl px-4 py-3 text-base border border-border mb-3"
-            placeholder="Nome della scheda..."
+            placeholder="Sheet name..."
             placeholderTextColor="#6b6b7b"
             value={newSheetName}
             onChangeText={setNewSheetName}
@@ -113,13 +123,13 @@ export default function HomeScreen() {
               className="flex-1 bg-background rounded-xl py-3 items-center"
               onPress={() => setShowCreate(false)}
             >
-              <Text className="text-text-secondary font-semibold">Annulla</Text>
+              <Text className="text-text-secondary font-semibold">Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity
               className="flex-1 bg-primary rounded-xl py-3 items-center"
               onPress={handleCreate}
             >
-              <Text className="text-white font-semibold">Crea</Text>
+              <Text className="text-white font-semibold">Create</Text>
             </TouchableOpacity>
           </View>
         </View>

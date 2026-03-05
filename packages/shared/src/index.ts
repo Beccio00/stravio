@@ -120,3 +120,20 @@ export interface WorkoutSheetFull extends WorkoutSheet {
 export interface ExerciseFull extends Exercise {
   sets: ExerciseSet[];
 }
+
+// --- History types ---
+export interface WorkoutSessionWithSheet extends WorkoutSession {
+  sheetName: string;
+}
+
+export interface SessionExerciseGroup {
+  exerciseId: number;
+  exerciseName: string;
+  sets: SessionSetLog[];
+}
+
+export interface SessionDetailFull extends WorkoutSession {
+  sheetName: string;
+  logs: SessionSetLog[];
+  exercises: SessionExerciseGroup[];
+}
