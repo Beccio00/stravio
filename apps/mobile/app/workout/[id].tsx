@@ -1,7 +1,7 @@
 import { View, Text, TouchableOpacity, ScrollView, Alert, TextInput, Platform } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useSheet, useSession, useLogSessionSet, useCompleteSession, useLastSessionBySheet, useUpdateSet } from "../../src/api/hooks";
+import { useSheet, useSession, useLogSessionSet, useCompleteSession, useLastSessionBySheet, useUpdateSet, useSessionExerciseNotes, useUpsertExerciseNote } from "../../src/api/hooks";
 import { useState, useEffect, useMemo } from "react";
 import type { ExerciseFull, ExerciseSet, SessionSetLog } from "@bhmt3wp/shared";
 
@@ -29,6 +29,8 @@ export default function WorkoutScreen() {
   const completeSession = useCompleteSession();
   const updateSet = useUpdateSet(parseInt(sheetId!));
   const { data: lastSessionData } = useLastSessionBySheet(parseInt(sheetId!));
+  const { data: exerciseNotes } = useSessionExerciseNotes(sessionId);
+  const upsertNote = useUpsertExerciseNote();
 
   // Build lookup: "exerciseId-setNumber" → previous log
   const prevLogs = useMemo(() => {
@@ -45,6 +47,9 @@ export default function WorkoutScreen() {
   const [completedSets, setCompletedSets] = useState<Set<string>>(new Set());
   // Editable values per set: key = "exerciseId-setNumber"
   const [editValues, setEditValues] = useState<Record<string, { kg: string; reps: string }>>({});
+  // Exercise notes: key = exerciseId
+  const [notes, setNotes] = useState<Record<number, string>>({});
+  const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
   const [restTimeLeft, setRestTimeLeft] = useState(0);
 
   // Initialize editable values from sheet template
@@ -67,6 +72,16 @@ export default function WorkoutScreen() {
     }
   }, [sheet]);
 
+  // Load existing exercise notes
+  useEffect(() => {
+    if (!exerciseNotes) return;
+    const notesMap: Record<number, string> = {};
+    for (const note of exerciseNotes) {
+      notesMap[note.exerciseId] = note.notes;
+    }
+    setNotes(notesMap);
+  }, [exerciseNotes]);
+
   // Rest timer
   useEffect(() => {
     if (restTimeLeft <= 0) return;
@@ -85,6 +100,22 @@ export default function WorkoutScreen() {
       ...prev,
       [key]: { ...prev[key], [field]: value },
     }));
+  };
+
+  const updateExerciseNote = (exerciseId: number, text: string) => {
+    setNotes((prev) => ({ ...prev, [exerciseId]: text }));
+  };
+
+  const handleBlurNote = (exerciseId: number) => {
+    const noteText = notes[exerciseId] || "";
+    const trimmedNote = noteText.trim();
+    // Save to backend
+    upsertNote.mutate({
+      sessionId,
+      exerciseId,
+      notes: trimmedNote,
+    });
+    setEditingNoteId(null);
   };
 
   const handleCompleteSet = (exercise: ExerciseFull, set: ExerciseSet) => {
@@ -113,6 +144,17 @@ export default function WorkoutScreen() {
   };
 
   const handleFinishWorkout = () => {
+    // Validate that at least one set is completed
+    if (completedSets.size === 0) {
+      const msg = "You must complete at least one set before finishing the workout.";
+      if (Platform.OS === "web") {
+        window.alert(msg);
+      } else {
+        Alert.alert("Cannot Finish", msg);
+      }
+      return;
+    }
+
     confirmAction("Complete Workout", "Do you want to finish the workout?", async () => {
       try {
         console.log("Completing session:", sessionId);
@@ -192,7 +234,34 @@ export default function WorkoutScreen() {
       <ScrollView className="flex-1 px-5" contentContainerStyle={{ paddingBottom: 40 }}>
         {sheet.exercises.map((exercise) => (
           <View key={exercise.id} className="bg-surface rounded-2xl p-4 mb-3 border border-border">
-            <Text className="text-text-primary text-lg font-bold mb-3">{exercise.name}</Text>
+            <Text className="text-text-primary text-lg font-bold mb-2">{exercise.name}</Text>
+
+            {/* Exercise Notes */}
+            {editingNoteId === exercise.id ? (
+              <TextInput
+                className="bg-background border border-border rounded-lg px-3 py-2 text-text-primary text-sm mb-3"
+                placeholder="Add notes for this exercise..."
+                placeholderTextColor="#999"
+                value={notes[exercise.id] || ""}
+                onChangeText={(text) => updateExerciseNote(exercise.id, text)}
+                onBlur={() => handleBlurNote(exercise.id)}
+                multiline
+                numberOfLines={3}
+                textAlignVertical="top"
+                autoFocus
+              />
+            ) : (
+              <TouchableOpacity
+                className="mb-3"
+                onPress={() => setEditingNoteId(exercise.id)}
+              >
+                {notes[exercise.id] ? (
+                  <Text className="text-text-muted text-sm">{notes[exercise.id]}</Text>
+                ) : (
+                  <Text className="text-text-muted text-sm italic">Tap to add notes...</Text>
+                )}
+              </TouchableOpacity>
+            )}
 
             {/* Set header */}
             <View className="flex-row mb-2 px-1">

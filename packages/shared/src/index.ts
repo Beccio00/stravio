@@ -102,6 +102,21 @@ export interface CreateSessionSetLogInput {
   weightKg: number;
 }
 
+// --- Session Exercise Note (notes for exercise during workout) ---
+export interface SessionExerciseNote {
+  id: number;
+  sessionId: number;
+  exerciseId: number;
+  notes: string;
+  updatedAt: string;
+}
+
+export interface UpsertSessionExerciseNoteInput {
+  sessionId: number;
+  exerciseId: number;
+  notes: string;
+}
+
 // --- API Response wrappers ---
 export interface ApiResponse<T> {
   data: T;

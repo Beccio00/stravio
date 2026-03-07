@@ -1,7 +1,7 @@
 import { FastifyInstance } from "fastify";
 import { db, schema } from "../db/index.js";
 import { eq, and, isNotNull, desc } from "drizzle-orm";
-import type { CreateWorkoutSessionInput, CreateSessionSetLogInput } from "@bhmt3wp/shared";
+import type { CreateWorkoutSessionInput, CreateSessionSetLogInput, UpsertSessionExerciseNoteInput } from "@bhmt3wp/shared";
 
 export async function sessionRoutes(app: FastifyInstance) {
   // GET /api/sessions - List all sessions
@@ -96,6 +96,25 @@ export async function sessionRoutes(app: FastifyInstance) {
       .values({ sheetId, notes: notes ?? null })
       .returning();
 
+    // Copy exercise template notes to session notes
+    const exercises = await db
+      .select()
+      .from(schema.exercises)
+      .where(eq(schema.exercises.sheetId, sheetId));
+
+    const notesToInsert = exercises
+      .filter(ex => ex.notes && ex.notes.trim())
+      .map(ex => ({
+        sessionId: result.id,
+        exerciseId: ex.id,
+        notes: ex.notes!,
+        updatedAt: new Date().toISOString(),
+      }));
+
+    if (notesToInsert.length > 0) {
+      await db.insert(schema.sessionExerciseNotes).values(notesToInsert);
+    }
+
     return reply.status(201).send({ data: result });
   });
 
@@ -163,6 +182,53 @@ export async function sessionRoutes(app: FastifyInstance) {
         .where(eq(schema.sessionSetLogs.sessionId, lastSession.id));
 
       return { data: { session: lastSession, logs } };
+    }
+  );
+
+  // GET /api/sessions/:id/exercise-notes - Get all exercise notes for a session
+  app.get<{ Params: { id: string } }>("/api/sessions/:id/exercise-notes", async (req) => {
+    const sessionId = parseInt(req.params.id);
+    const notes = await db
+      .select()
+      .from(schema.sessionExerciseNotes)
+      .where(eq(schema.sessionExerciseNotes.sessionId, sessionId));
+    return { data: notes };
+  });
+
+  // PUT /api/session-exercise-notes - Upsert (insert or update) exercise note
+  app.put<{ Body: UpsertSessionExerciseNoteInput }>(
+    "/api/session-exercise-notes",
+    async (req, reply) => {
+      const { sessionId, exerciseId, notes } = req.body;
+
+      // Check if note already exists
+      const [existing] = await db
+        .select()
+        .from(schema.sessionExerciseNotes)
+        .where(
+          and(
+            eq(schema.sessionExerciseNotes.sessionId, sessionId),
+            eq(schema.sessionExerciseNotes.exerciseId, exerciseId)
+          )
+        )
+        .limit(1);
+
+      if (existing) {
+        // Update existing note
+        const [result] = await db
+          .update(schema.sessionExerciseNotes)
+          .set({ notes, updatedAt: new Date().toISOString() })
+          .where(eq(schema.sessionExerciseNotes.id, existing.id))
+          .returning();
+        return { data: result };
+      } else {
+        // Insert new note
+        const [result] = await db
+          .insert(schema.sessionExerciseNotes)
+          .values({ sessionId, exerciseId, notes })
+          .returning();
+        return reply.status(201).send({ data: result });
+      }
     }
   );
 }

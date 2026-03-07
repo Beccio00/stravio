@@ -13,6 +13,7 @@ import {
   useSheet,
   useCreateExercise,
   useDeleteExercise,
+  useUpdateExercise,
   useCreateSet,
   useUpdateSet,
   useDeleteSet,
@@ -28,6 +29,7 @@ export default function SheetDetailScreen() {
   const { data: sheet, isLoading } = useSheet(sheetId);
   const createExercise = useCreateExercise();
   const deleteExercise = useDeleteExercise(sheetId);
+  const updateExercise = useUpdateExercise(sheetId);
   const createSet = useCreateSet(sheetId);
   const updateSet = useUpdateSet(sheetId);
   const deleteSet = useDeleteSet(sheetId);
@@ -132,6 +134,7 @@ export default function SheetDetailScreen() {
             key={exercise.id}
             exercise={exercise}
             onDelete={() => handleDeleteExercise(exercise.id, exercise.name)}
+            onUpdateExercise={(data) => updateExercise.mutate({ id: exercise.id, ...data })}
             onAddSet={() => handleAddSet(exercise.id, exercise.sets)}
             onUpdateSet={(setId, data) => updateSet.mutate({ id: setId, ...data })}
             onDeleteSet={(setId) => deleteSet.mutate(setId)}
@@ -182,16 +185,29 @@ export default function SheetDetailScreen() {
 function ExerciseCard({
   exercise,
   onDelete,
+  onUpdateExercise,
   onAddSet,
   onUpdateSet,
   onDeleteSet,
 }: {
   exercise: ExerciseFull;
   onDelete: () => void;
+  onUpdateExercise: (data: { notes?: string }) => void;
   onAddSet: () => void;
   onUpdateSet: (setId: number, data: { reps?: number; weightKg?: number; restTimeSec?: number }) => void;
   onDeleteSet: (setId: number) => void;
 }) {
+  const [notes, setNotes] = useState(exercise.notes || "");
+  const [isEditingNotes, setIsEditingNotes] = useState(false);
+
+  const handleBlurNotes = () => {
+    const trimmedNotes = notes.trim();
+    if (trimmedNotes !== (exercise.notes || "")) {
+      onUpdateExercise({ notes: trimmedNotes || undefined });
+    }
+    setIsEditingNotes(false);
+  };
+
   return (
     <View className="bg-surface rounded-2xl p-4 mb-3 border border-border">
       <View className="flex-row items-center justify-between mb-3">
@@ -201,8 +217,31 @@ function ExerciseCard({
         </TouchableOpacity>
       </View>
 
-      {exercise.notes && (
-        <Text className="text-text-muted text-sm mb-3">{exercise.notes}</Text>
+      {/* Exercise Notes */}
+      {isEditingNotes ? (
+        <TextInput
+          className="bg-background border border-border rounded-lg px-3 py-2 text-text-primary text-sm mb-3"
+          placeholder="Add notes for this exercise..."
+          placeholderTextColor="#999"
+          value={notes}
+          onChangeText={setNotes}
+          onBlur={handleBlurNotes}
+          multiline
+          numberOfLines={3}
+          textAlignVertical="top"
+          autoFocus
+        />
+      ) : (
+        <TouchableOpacity
+          className="mb-3"
+          onPress={() => setIsEditingNotes(true)}
+        >
+          {exercise.notes ? (
+            <Text className="text-text-muted text-sm">{exercise.notes}</Text>
+          ) : (
+            <Text className="text-text-muted text-sm italic">Tap to add notes...</Text>
+          )}
+        </TouchableOpacity>
       )}
 
       {/* Sets header */}

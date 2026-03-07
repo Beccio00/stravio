@@ -17,6 +17,8 @@ import type {
   CreateWorkoutSessionInput,
   CreateSessionSetLogInput,
   SessionSetLog,
+  SessionExerciseNote,
+  UpsertSessionExerciseNoteInput,
   ApiResponse,
 } from "@bhmt3wp/shared";
 
@@ -147,5 +149,14 @@ export const api = {
       request<ApiResponse<{ session: WorkoutSession; logs: SessionSetLog[] } | null>>(
         `/api/sessions/last-by-sheet/${sheetId}`
       ).then((r) => r.data),
+    getExerciseNotes: (sessionId: number) =>
+      request<ApiResponse<SessionExerciseNote[]>>(
+        `/api/sessions/${sessionId}/exercise-notes`
+      ).then((r) => r.data),
+    upsertExerciseNote: (data: UpsertSessionExerciseNoteInput) =>
+      request<ApiResponse<SessionExerciseNote>>("/api/session-exercise-notes", {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }).then((r) => r.data),
   },
 };

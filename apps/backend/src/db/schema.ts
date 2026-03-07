@@ -69,3 +69,18 @@ export const sessionSetLogs = sqliteTable("session_set_logs", {
     .notNull()
     .default(sql`(datetime('now'))`),
 });
+
+// --- Session Exercise Notes (notes per exercise during a workout) ---
+export const sessionExerciseNotes = sqliteTable("session_exercise_notes", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  sessionId: integer("session_id")
+    .notNull()
+    .references(() => workoutSessions.id, { onDelete: "cascade" }),
+  exerciseId: integer("exercise_id")
+    .notNull()
+    .references(() => exercises.id, { onDelete: "cascade" }),
+  notes: text("notes").notNull(),
+  updatedAt: text("updated_at")
+    .notNull()
+    .default(sql`(datetime('now'))`),
+});

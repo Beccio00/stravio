@@ -9,6 +9,7 @@ import type {
   UpdateExerciseSetInput,
   CreateWorkoutSessionInput,
   CreateSessionSetLogInput,
+  UpsertSessionExerciseNoteInput,
 } from "@bhmt3wp/shared";
 
 // ==================== SHEETS ====================
@@ -181,5 +182,23 @@ export function useLastSessionBySheet(sheetId: number) {
     queryKey: ["sessions", "last-by-sheet", sheetId],
     queryFn: () => api.sessions.lastBySheet(sheetId),
     enabled: !!sheetId,
+  });
+}
+
+export function useSessionExerciseNotes(sessionId: number) {
+  return useQuery({
+    queryKey: ["sessions", sessionId, "exercise-notes"],
+    queryFn: () => api.sessions.getExerciseNotes(sessionId),
+    enabled: !!sessionId,
+  });
+}
+
+export function useUpsertExerciseNote() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: UpsertSessionExerciseNoteInput) => api.sessions.upsertExerciseNote(data),
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["sessions", vars.sessionId, "exercise-notes"] });
+    },
   });
 }
