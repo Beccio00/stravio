@@ -1,0 +1,7 @@
+{
+  "name": "react-native-worklets",
+  "version": "0.0.0-stub",
+  "description": "No-op stub to satisfy NativeWind's babel dependency on react-native-worklets/plugin without including the native module",
+  "main": "index.js",
+  "private": true
+}
