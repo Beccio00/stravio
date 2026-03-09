@@ -1,6 +1,8 @@
 {
     "chat.tools.terminal.autoApprove": {
         "tee": true,
-        "npm uninstall": true
+        "npm uninstall": true,
+        "npm install": true,
+        "true": true
     }
 }
