@@ -1,0 +1,1 @@
+apps/mobile/tailwind.config.js

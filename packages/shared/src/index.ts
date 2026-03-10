@@ -2,6 +2,17 @@
 // Shared types for the gym workout tracker app
 // ============================================
 
+// --- User / Auth ---
+export type UserRole = "coach" | "allievo";
+
+export interface UserProfile {
+  id: string;
+  role: UserRole;
+  displayName: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // --- Workout Sheet (Scheda) ---
 export interface WorkoutSheet {
   id: number;

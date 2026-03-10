@@ -1,6 +1,7 @@
 {
   "name": "bhmt3wp",
   "private": true,
+  "main": "expo-router/entry",
   "workspaces": [
     "packages/*",
     "apps/*"

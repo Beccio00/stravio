@@ -4,9 +4,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useSheets, useCreateSheet, useDeleteSheet } from "../src/api/hooks";
 import { useState } from "react";
 import type { WorkoutSheet } from "@bhmt3wp/shared";
+import { useAuth } from "../src/contexts/AuthContext";
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { profile, signOut } = useAuth();
   const { data: sheets, isLoading, error } = useSheets();
   const createSheet = useCreateSheet();
   const deleteSheet = useDeleteSheet();
@@ -63,6 +65,28 @@ export default function HomeScreen() {
   return (
     <SafeAreaView className="flex-1 bg-background">
       <View className="px-5 pt-4 pb-2">
+        {/* User info bar */}
+        <View className="flex-row items-center justify-between mb-3">
+          <View className="flex-row items-center">
+            <View className="bg-primary/20 rounded-full w-8 h-8 items-center justify-center mr-2">
+              <Text className="text-primary text-sm font-bold">
+                {profile?.display_name?.[0]?.toUpperCase() ?? "?"}
+              </Text>
+            </View>
+            <View>
+              <Text className="text-text-primary text-sm font-semibold">
+                {profile?.display_name ?? "User"}
+              </Text>
+              <Text className="text-text-muted text-xs">
+                {profile?.role === "coach" ? "🎯 Coach" : "💪 Athlete"}
+              </Text>
+            </View>
+          </View>
+          <TouchableOpacity onPress={signOut}>
+            <Text className="text-danger text-sm">Logout</Text>
+          </TouchableOpacity>
+        </View>
+
         <View className="flex-row items-center justify-between">
           <View>
             <Text className="text-text-primary text-3xl font-bold">🏋️ My Sheets</Text>
