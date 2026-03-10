@@ -6,7 +6,7 @@ import { useSession } from "../../src/api/hooks";
 
 export default function SessionDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const sessionId = parseInt(id!);
+  const sessionId = id!;
   const router = useRouter();
   const { data: session, isLoading } = useSession(sessionId);
 

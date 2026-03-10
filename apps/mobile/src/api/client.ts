@@ -1,17 +1,12 @@
 /**
- * Local-first API client.
+ * Supabase API client.
  *
- * On native (phone APK) → uses a local SQLite database (expo-sqlite + drizzle).
- * On web (dev) → calls the Fastify backend (HTTP).
- *
- * The exported `api` object has the exact same shape in both cases,
- * so hooks.ts and all screens work unchanged.
- *
- * In the future, swap this to a remote backend by changing the
- * implementation behind `api`.
+ * All data (sheets, exercises, sessions, etc.) is stored in Supabase Postgres.
+ * RLS policies ensure each user only sees their own data.
+ * Works identically on mobile (React Native) and web (Expo web).
  */
 
-import { Platform } from "react-native";
+import { supabase } from "../lib/supabase";
 import type {
   WorkoutSheet,
   WorkoutSheetFull,
@@ -32,505 +27,463 @@ import type {
   SessionExerciseNote,
   UpsertSessionExerciseNoteInput,
   ExerciseFull,
-  ApiResponse,
 } from "@bhmt3wp/shared";
 
-// =====================================================
-// WEB → HTTP client (dev only, talks to Fastify backend)
-// =====================================================
-function createHttpApi() {
-  const getBaseUrl = () => {
-    const host =
-      typeof window !== "undefined" ? window.location.hostname : "localhost";
-    return `http://${host}:3000`;
-  };
+// ---------------------------------------------------------------------------
+// Helpers – Supabase returns snake_case, our types use camelCase
+// ---------------------------------------------------------------------------
 
-  const BASE_URL = getBaseUrl();
+async function getUserId(): Promise<string> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+  return user.id;
+}
 
-  async function request<T>(path: string, options?: RequestInit): Promise<T> {
-    const headers: Record<string, string> = {
-      ...((options?.headers as Record<string, string>) || {}),
-    };
-    if (options?.body) {
-      headers["Content-Type"] = "application/json";
-    }
-    const res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
-    if (!res.ok) {
-      const error = await res
-        .json()
-        .catch(() => ({ message: "Unknown error" }));
-      throw new Error(error.message || `HTTP ${res.status}`);
-    }
-    if (res.status === 204) return undefined as T;
-    return res.json();
-  }
-
+function mapSheet(row: any): WorkoutSheet {
   return {
-    sheets: {
-      list: () =>
-        request<ApiResponse<WorkoutSheet[]>>("/api/sheets").then(
-          (r) => r.data
-        ),
-      get: (id: number) =>
-        request<ApiResponse<WorkoutSheetFull>>(`/api/sheets/${id}`).then(
-          (r) => r.data
-        ),
-      create: (data: CreateWorkoutSheetInput) =>
-        request<ApiResponse<WorkoutSheet>>("/api/sheets", {
-          method: "POST",
-          body: JSON.stringify(data),
-        }).then((r) => r.data),
-      update: (id: number, data: UpdateWorkoutSheetInput) =>
-        request<ApiResponse<WorkoutSheet>>(`/api/sheets/${id}`, {
-          method: "PATCH",
-          body: JSON.stringify(data),
-        }).then((r) => r.data),
-      delete: (id: number) =>
-        request<void>(`/api/sheets/${id}`, { method: "DELETE" }),
-    },
-    exercises: {
-      listBySheet: (sheetId: number) =>
-        request<ApiResponse<Exercise[]>>(
-          `/api/sheets/${sheetId}/exercises`
-        ).then((r) => r.data),
-      create: (data: CreateExerciseInput) =>
-        request<ApiResponse<Exercise>>("/api/exercises", {
-          method: "POST",
-          body: JSON.stringify(data),
-        }).then((r) => r.data),
-      update: (id: number, data: UpdateExerciseInput) =>
-        request<ApiResponse<Exercise>>(`/api/exercises/${id}`, {
-          method: "PATCH",
-          body: JSON.stringify(data),
-        }).then((r) => r.data),
-      delete: (id: number) =>
-        request<void>(`/api/exercises/${id}`, { method: "DELETE" }),
-    },
-    sets: {
-      listByExercise: (exerciseId: number) =>
-        request<ApiResponse<ExerciseSet[]>>(
-          `/api/exercises/${exerciseId}/sets`
-        ).then((r) => r.data),
-      create: (data: CreateExerciseSetInput) =>
-        request<ApiResponse<ExerciseSet>>("/api/sets", {
-          method: "POST",
-          body: JSON.stringify(data),
-        }).then((r) => r.data),
-      update: (id: number, data: UpdateExerciseSetInput) =>
-        request<ApiResponse<ExerciseSet>>(`/api/sets/${id}`, {
-          method: "PATCH",
-          body: JSON.stringify(data),
-        }).then((r) => r.data),
-      delete: (id: number) =>
-        request<void>(`/api/sets/${id}`, { method: "DELETE" }),
-    },
-    sessions: {
-      list: () =>
-        request<ApiResponse<WorkoutSession[]>>("/api/sessions").then(
-          (r) => r.data
-        ),
-      completed: () =>
-        request<ApiResponse<WorkoutSessionWithSheet[]>>(
-          "/api/sessions/completed"
-        ).then((r) => r.data),
-      get: (id: number) =>
-        request<ApiResponse<SessionDetailFull>>(`/api/sessions/${id}`).then(
-          (r) => r.data
-        ),
-      create: (data: CreateWorkoutSessionInput) =>
-        request<ApiResponse<WorkoutSession>>("/api/sessions", {
-          method: "POST",
-          body: JSON.stringify(data),
-        }).then((r) => r.data),
-      complete: (id: number) =>
-        request<ApiResponse<WorkoutSession>>(
-          `/api/sessions/${id}/complete`,
-          { method: "PATCH" }
-        ).then((r) => r.data),
-      delete: (id: number) =>
-        request<void>(`/api/sessions/${id}`, { method: "DELETE" }),
-      logSet: (data: CreateSessionSetLogInput) =>
-        request<ApiResponse<SessionSetLog>>("/api/session-logs", {
-          method: "POST",
-          body: JSON.stringify(data),
-        }).then((r) => r.data),
-      lastBySheet: (sheetId: number) =>
-        request<
-          ApiResponse<{
-            session: WorkoutSession;
-            logs: SessionSetLog[];
-          } | null>
-        >(`/api/sessions/last-by-sheet/${sheetId}`).then((r) => r.data),
-      getExerciseNotes: (sessionId: number) =>
-        request<ApiResponse<SessionExerciseNote[]>>(
-          `/api/sessions/${sessionId}/exercise-notes`
-        ).then((r) => r.data),
-      upsertExerciseNote: (data: UpsertSessionExerciseNoteInput) =>
-        request<ApiResponse<SessionExerciseNote>>(
-          "/api/session-exercise-notes",
-          { method: "PUT", body: JSON.stringify(data) }
-        ).then((r) => r.data),
-    },
+    id: row.id,
+    userId: row.user_id,
+    name: row.name,
+    description: row.description,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   };
 }
 
-// =====================================================
-// NATIVE → Local SQLite database
-// =====================================================
-function createLocalApi() {
-  // Lazy import so web bundle doesn't pull in expo-sqlite
-  const { db, schema } =
-    require("../db") as typeof import("../db");
-  const { eq, and, isNotNull, desc } =
-    require("drizzle-orm") as typeof import("drizzle-orm");
-
+function mapExercise(row: any): Exercise {
   return {
-    sheets: {
-      list: async (): Promise<WorkoutSheet[]> => {
-        return db.select().from(schema.workoutSheets);
-      },
-
-      get: async (id: number): Promise<WorkoutSheetFull> => {
-        const [sheet] = await db
-          .select()
-          .from(schema.workoutSheets)
-          .where(eq(schema.workoutSheets.id, id))
-          .limit(1);
-        if (!sheet) throw new Error("Sheet not found");
-
-        const exerciseRows = await db
-          .select()
-          .from(schema.exercises)
-          .where(eq(schema.exercises.sheetId, id))
-          .orderBy(schema.exercises.orderIndex);
-
-        const exercisesWithSets: ExerciseFull[] = await Promise.all(
-          exerciseRows.map(async (ex) => {
-            const sets = await db
-              .select()
-              .from(schema.exerciseSets)
-              .where(eq(schema.exerciseSets.exerciseId, ex.id))
-              .orderBy(schema.exerciseSets.setNumber);
-            return { ...ex, sets } as ExerciseFull;
-          })
-        );
-
-        return { ...sheet, exercises: exercisesWithSets };
-      },
-
-      create: async (data: CreateWorkoutSheetInput): Promise<WorkoutSheet> => {
-        const [result] = await db
-          .insert(schema.workoutSheets)
-          .values({
-            name: data.name,
-            description: data.description ?? null,
-          })
-          .returning();
-        return result;
-      },
-
-      update: async (
-        id: number,
-        data: UpdateWorkoutSheetInput
-      ): Promise<WorkoutSheet> => {
-        const [result] = await db
-          .update(schema.workoutSheets)
-          .set({ ...data, updatedAt: new Date().toISOString() })
-          .where(eq(schema.workoutSheets.id, id))
-          .returning();
-        if (!result) throw new Error("Sheet not found");
-        return result;
-      },
-
-      delete: async (id: number): Promise<void> => {
-        await db
-          .delete(schema.workoutSheets)
-          .where(eq(schema.workoutSheets.id, id));
-      },
-    },
-
-    exercises: {
-      listBySheet: async (sheetId: number): Promise<Exercise[]> => {
-        return db
-          .select()
-          .from(schema.exercises)
-          .where(eq(schema.exercises.sheetId, sheetId))
-          .orderBy(schema.exercises.orderIndex);
-      },
-
-      create: async (data: CreateExerciseInput): Promise<Exercise> => {
-        const [result] = await db
-          .insert(schema.exercises)
-          .values({
-            sheetId: data.sheetId,
-            name: data.name,
-            notes: data.notes ?? null,
-            orderIndex: data.orderIndex ?? 0,
-          })
-          .returning();
-        return result;
-      },
-
-      update: async (
-        id: number,
-        data: UpdateExerciseInput
-      ): Promise<Exercise> => {
-        const [result] = await db
-          .update(schema.exercises)
-          .set(data)
-          .where(eq(schema.exercises.id, id))
-          .returning();
-        if (!result) throw new Error("Exercise not found");
-        return result;
-      },
-
-      delete: async (id: number): Promise<void> => {
-        await db.delete(schema.exercises).where(eq(schema.exercises.id, id));
-      },
-    },
-
-    sets: {
-      listByExercise: async (exerciseId: number): Promise<ExerciseSet[]> => {
-        return db
-          .select()
-          .from(schema.exerciseSets)
-          .where(eq(schema.exerciseSets.exerciseId, exerciseId))
-          .orderBy(schema.exerciseSets.setNumber);
-      },
-
-      create: async (data: CreateExerciseSetInput): Promise<ExerciseSet> => {
-        const [result] = await db
-          .insert(schema.exerciseSets)
-          .values(data)
-          .returning();
-        return result;
-      },
-
-      update: async (
-        id: number,
-        data: UpdateExerciseSetInput
-      ): Promise<ExerciseSet> => {
-        const [result] = await db
-          .update(schema.exerciseSets)
-          .set(data)
-          .where(eq(schema.exerciseSets.id, id))
-          .returning();
-        if (!result) throw new Error("Set not found");
-        return result;
-      },
-
-      delete: async (id: number): Promise<void> => {
-        await db
-          .delete(schema.exerciseSets)
-          .where(eq(schema.exerciseSets.id, id));
-      },
-    },
-
-    sessions: {
-      list: async (): Promise<WorkoutSession[]> => {
-        return db.select().from(schema.workoutSessions);
-      },
-
-      completed: async (): Promise<WorkoutSessionWithSheet[]> => {
-        const sessions = await db
-          .select()
-          .from(schema.workoutSessions)
-          .where(isNotNull(schema.workoutSessions.completedAt))
-          .orderBy(desc(schema.workoutSessions.completedAt));
-
-        const enriched = await Promise.all(
-          sessions.map(async (s) => {
-            const [sheet] = await db
-              .select({ name: schema.workoutSheets.name })
-              .from(schema.workoutSheets)
-              .where(eq(schema.workoutSheets.id, s.sheetId))
-              .limit(1);
-            return {
-              ...s,
-              sheetName: sheet?.name ?? "Deleted sheet",
-            };
-          })
-        );
-        return enriched;
-      },
-
-      get: async (id: number): Promise<SessionDetailFull> => {
-        const [session] = await db
-          .select()
-          .from(schema.workoutSessions)
-          .where(eq(schema.workoutSessions.id, id))
-          .limit(1);
-        if (!session) throw new Error("Session not found");
-
-        const [sheet] = await db
-          .select({ name: schema.workoutSheets.name })
-          .from(schema.workoutSheets)
-          .where(eq(schema.workoutSheets.id, session.sheetId))
-          .limit(1);
-
-        const logs = await db
-          .select()
-          .from(schema.sessionSetLogs)
-          .where(eq(schema.sessionSetLogs.sessionId, id))
-          .orderBy(schema.sessionSetLogs.setNumber);
-
-        const exerciseIds = [...new Set(logs.map((l) => l.exerciseId))];
-        const exercises = await Promise.all(
-          exerciseIds.map(async (exId) => {
-            const [ex] = await db
-              .select({ name: schema.exercises.name })
-              .from(schema.exercises)
-              .where(eq(schema.exercises.id, exId))
-              .limit(1);
-            return {
-              exerciseId: exId,
-              exerciseName: ex?.name ?? "Deleted exercise",
-              sets: logs
-                .filter((l) => l.exerciseId === exId)
-                .sort((a, b) => a.setNumber - b.setNumber),
-            };
-          })
-        );
-
-        return {
-          ...session,
-          sheetName: sheet?.name ?? "Deleted sheet",
-          logs,
-          exercises,
-        };
-      },
-
-      create: async (
-        data: CreateWorkoutSessionInput
-      ): Promise<WorkoutSession> => {
-        const [result] = await db
-          .insert(schema.workoutSessions)
-          .values({ sheetId: data.sheetId, notes: data.notes ?? null })
-          .returning();
-
-        // Copy exercise template notes to session notes
-        const exs = await db
-          .select()
-          .from(schema.exercises)
-          .where(eq(schema.exercises.sheetId, data.sheetId));
-
-        const notesToInsert = exs
-          .filter((ex) => ex.notes && ex.notes.trim())
-          .map((ex) => ({
-            sessionId: result.id,
-            exerciseId: ex.id,
-            notes: ex.notes!,
-            updatedAt: new Date().toISOString(),
-          }));
-
-        if (notesToInsert.length > 0) {
-          await db.insert(schema.sessionExerciseNotes).values(notesToInsert);
-        }
-
-        return result;
-      },
-
-      complete: async (id: number): Promise<WorkoutSession> => {
-        const [result] = await db
-          .update(schema.workoutSessions)
-          .set({ completedAt: new Date().toISOString() })
-          .where(eq(schema.workoutSessions.id, id))
-          .returning();
-        if (!result) throw new Error("Session not found");
-        return result;
-      },
-
-      delete: async (id: number): Promise<void> => {
-        await db
-          .delete(schema.workoutSessions)
-          .where(eq(schema.workoutSessions.id, id));
-      },
-
-      logSet: async (
-        data: CreateSessionSetLogInput
-      ): Promise<SessionSetLog> => {
-        const [result] = await db
-          .insert(schema.sessionSetLogs)
-          .values(data)
-          .returning();
-        return result;
-      },
-
-      lastBySheet: async (
-        sheetId: number
-      ): Promise<{
-        session: WorkoutSession;
-        logs: SessionSetLog[];
-      } | null> => {
-        const [lastSession] = await db
-          .select()
-          .from(schema.workoutSessions)
-          .where(
-            and(
-              eq(schema.workoutSessions.sheetId, sheetId),
-              isNotNull(schema.workoutSessions.completedAt)
-            )
-          )
-          .orderBy(desc(schema.workoutSessions.completedAt))
-          .limit(1);
-
-        if (!lastSession) return null;
-
-        const logs = await db
-          .select()
-          .from(schema.sessionSetLogs)
-          .where(eq(schema.sessionSetLogs.sessionId, lastSession.id));
-
-        return { session: lastSession, logs };
-      },
-
-      getExerciseNotes: async (
-        sessionId: number
-      ): Promise<SessionExerciseNote[]> => {
-        return db
-          .select()
-          .from(schema.sessionExerciseNotes)
-          .where(eq(schema.sessionExerciseNotes.sessionId, sessionId));
-      },
-
-      upsertExerciseNote: async (
-        data: UpsertSessionExerciseNoteInput
-      ): Promise<SessionExerciseNote> => {
-        const [existing] = await db
-          .select()
-          .from(schema.sessionExerciseNotes)
-          .where(
-            and(
-              eq(schema.sessionExerciseNotes.sessionId, data.sessionId),
-              eq(schema.sessionExerciseNotes.exerciseId, data.exerciseId)
-            )
-          )
-          .limit(1);
-
-        if (existing) {
-          const [result] = await db
-            .update(schema.sessionExerciseNotes)
-            .set({
-              notes: data.notes,
-              updatedAt: new Date().toISOString(),
-            })
-            .where(eq(schema.sessionExerciseNotes.id, existing.id))
-            .returning();
-          return result;
-        } else {
-          const [result] = await db
-            .insert(schema.sessionExerciseNotes)
-            .values(data)
-            .returning();
-          return result;
-        }
-      },
-    },
+    id: row.id,
+    sheetId: row.sheet_id,
+    name: row.name,
+    notes: row.notes,
+    orderIndex: row.order_index,
+    createdAt: row.created_at,
   };
 }
 
-// =====================================================
-// Export the right implementation based on platform
-// =====================================================
-export const api =
-  Platform.OS === "web" ? createHttpApi() : createLocalApi();
+function mapSet(row: any): ExerciseSet {
+  return {
+    id: row.id,
+    exerciseId: row.exercise_id,
+    setNumber: row.set_number,
+    reps: row.reps,
+    weightKg: row.weight_kg,
+    restTimeSec: row.rest_time_sec,
+  };
+}
+
+function mapSession(row: any): WorkoutSession {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    sheetId: row.sheet_id,
+    startedAt: row.started_at,
+    completedAt: row.completed_at,
+    notes: row.notes,
+  };
+}
+
+function mapLog(row: any): SessionSetLog {
+  return {
+    id: row.id,
+    sessionId: row.session_id,
+    exerciseId: row.exercise_id,
+    setNumber: row.set_number,
+    reps: row.reps,
+    weightKg: row.weight_kg,
+    completedAt: row.completed_at,
+  };
+}
+
+function mapNote(row: any): SessionExerciseNote {
+  return {
+    id: row.id,
+    sessionId: row.session_id,
+    exerciseId: row.exercise_id,
+    notes: row.notes,
+    updatedAt: row.updated_at,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// API implementation
+// ---------------------------------------------------------------------------
+
+export const api = {
+  sheets: {
+    list: async (): Promise<WorkoutSheet[]> => {
+      const { data, error } = await supabase
+        .from("workout_sheets")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) throw new Error(error.message);
+      return (data ?? []).map(mapSheet);
+    },
+
+    get: async (id: string): Promise<WorkoutSheetFull> => {
+      const { data: sheet, error } = await supabase
+        .from("workout_sheets")
+        .select("*")
+        .eq("id", id)
+        .single();
+      if (error) throw new Error(error.message);
+
+      const { data: exerciseRows } = await supabase
+        .from("exercises")
+        .select("*")
+        .eq("sheet_id", id)
+        .order("order_index");
+
+      const exercises: ExerciseFull[] = await Promise.all(
+        (exerciseRows ?? []).map(async (exRow) => {
+          const { data: setRows } = await supabase
+            .from("exercise_sets")
+            .select("*")
+            .eq("exercise_id", exRow.id)
+            .order("set_number");
+          return {
+            ...mapExercise(exRow),
+            sets: (setRows ?? []).map(mapSet),
+          };
+        }),
+      );
+
+      return { ...mapSheet(sheet), exercises };
+    },
+
+    create: async (data: CreateWorkoutSheetInput): Promise<WorkoutSheet> => {
+      const userId = await getUserId();
+      const { data: result, error } = await supabase
+        .from("workout_sheets")
+        .insert({
+          user_id: userId,
+          name: data.name,
+          description: data.description ?? null,
+        })
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
+      return mapSheet(result);
+    },
+
+    update: async (id: string, data: UpdateWorkoutSheetInput): Promise<WorkoutSheet> => {
+      const updates: Record<string, any> = {};
+      if (data.name !== undefined) updates.name = data.name;
+      if (data.description !== undefined) updates.description = data.description;
+
+      const { data: result, error } = await supabase
+        .from("workout_sheets")
+        .update(updates)
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
+      return mapSheet(result);
+    },
+
+    delete: async (id: string): Promise<void> => {
+      const { error } = await supabase.from("workout_sheets").delete().eq("id", id);
+      if (error) throw new Error(error.message);
+    },
+  },
+
+  exercises: {
+    listBySheet: async (sheetId: string): Promise<Exercise[]> => {
+      const { data, error } = await supabase
+        .from("exercises")
+        .select("*")
+        .eq("sheet_id", sheetId)
+        .order("order_index");
+      if (error) throw new Error(error.message);
+      return (data ?? []).map(mapExercise);
+    },
+
+    create: async (data: CreateExerciseInput): Promise<Exercise> => {
+      const { data: result, error } = await supabase
+        .from("exercises")
+        .insert({
+          sheet_id: data.sheetId,
+          name: data.name,
+          notes: data.notes ?? null,
+          order_index: data.orderIndex ?? 0,
+        })
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
+      return mapExercise(result);
+    },
+
+    update: async (id: string, data: UpdateExerciseInput): Promise<Exercise> => {
+      const updates: Record<string, any> = {};
+      if (data.name !== undefined) updates.name = data.name;
+      if (data.notes !== undefined) updates.notes = data.notes;
+      if (data.orderIndex !== undefined) updates.order_index = data.orderIndex;
+
+      const { data: result, error } = await supabase
+        .from("exercises")
+        .update(updates)
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
+      return mapExercise(result);
+    },
+
+    delete: async (id: string): Promise<void> => {
+      const { error } = await supabase.from("exercises").delete().eq("id", id);
+      if (error) throw new Error(error.message);
+    },
+  },
+
+  sets: {
+    listByExercise: async (exerciseId: string): Promise<ExerciseSet[]> => {
+      const { data, error } = await supabase
+        .from("exercise_sets")
+        .select("*")
+        .eq("exercise_id", exerciseId)
+        .order("set_number");
+      if (error) throw new Error(error.message);
+      return (data ?? []).map(mapSet);
+    },
+
+    create: async (data: CreateExerciseSetInput): Promise<ExerciseSet> => {
+      const { data: result, error } = await supabase
+        .from("exercise_sets")
+        .insert({
+          exercise_id: data.exerciseId,
+          set_number: data.setNumber,
+          reps: data.reps,
+          weight_kg: data.weightKg,
+          rest_time_sec: data.restTimeSec,
+        })
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
+      return mapSet(result);
+    },
+
+    update: async (id: string, data: UpdateExerciseSetInput): Promise<ExerciseSet> => {
+      const updates: Record<string, any> = {};
+      if (data.setNumber !== undefined) updates.set_number = data.setNumber;
+      if (data.reps !== undefined) updates.reps = data.reps;
+      if (data.weightKg !== undefined) updates.weight_kg = data.weightKg;
+      if (data.restTimeSec !== undefined) updates.rest_time_sec = data.restTimeSec;
+
+      const { data: result, error } = await supabase
+        .from("exercise_sets")
+        .update(updates)
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
+      return mapSet(result);
+    },
+
+    delete: async (id: string): Promise<void> => {
+      const { error } = await supabase.from("exercise_sets").delete().eq("id", id);
+      if (error) throw new Error(error.message);
+    },
+  },
+
+  sessions: {
+    list: async (): Promise<WorkoutSession[]> => {
+      const { data, error } = await supabase
+        .from("workout_sessions")
+        .select("*")
+        .order("started_at", { ascending: false });
+      if (error) throw new Error(error.message);
+      return (data ?? []).map(mapSession);
+    },
+
+    completed: async (): Promise<WorkoutSessionWithSheet[]> => {
+      const { data: sessions, error } = await supabase
+        .from("workout_sessions")
+        .select("*, workout_sheets(name)")
+        .not("completed_at", "is", null)
+        .order("completed_at", { ascending: false });
+      if (error) throw new Error(error.message);
+
+      return (sessions ?? []).map((s: any) => ({
+        ...mapSession(s),
+        sheetName: s.workout_sheets?.name ?? "Deleted sheet",
+      }));
+    },
+
+    get: async (id: string): Promise<SessionDetailFull> => {
+      const { data: session, error } = await supabase
+        .from("workout_sessions")
+        .select("*, workout_sheets(name)")
+        .eq("id", id)
+        .single();
+      if (error) throw new Error(error.message);
+
+      const { data: logRows } = await supabase
+        .from("session_set_logs")
+        .select("*")
+        .eq("session_id", id)
+        .order("set_number");
+
+      const logs = (logRows ?? []).map(mapLog);
+
+      // Group logs by exercise
+      const exerciseIds = [...new Set(logs.map((l) => l.exerciseId))];
+      const exercises = await Promise.all(
+        exerciseIds.map(async (exId) => {
+          const { data: ex } = await supabase
+            .from("exercises")
+            .select("name")
+            .eq("id", exId)
+            .single();
+          return {
+            exerciseId: exId,
+            exerciseName: ex?.name ?? "Deleted exercise",
+            sets: logs
+              .filter((l) => l.exerciseId === exId)
+              .sort((a, b) => a.setNumber - b.setNumber),
+          };
+        }),
+      );
+
+      return {
+        ...mapSession(session),
+        sheetName: session.workout_sheets?.name ?? "Deleted sheet",
+        logs,
+        exercises,
+      };
+    },
+
+    create: async (data: CreateWorkoutSessionInput): Promise<WorkoutSession> => {
+      const userId = await getUserId();
+      const { data: result, error } = await supabase
+        .from("workout_sessions")
+        .insert({
+          user_id: userId,
+          sheet_id: data.sheetId,
+          notes: data.notes ?? null,
+        })
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
+
+      // Copy exercise template notes to session notes
+      const { data: exs } = await supabase
+        .from("exercises")
+        .select("id, notes")
+        .eq("sheet_id", data.sheetId);
+
+      const notesToInsert = (exs ?? [])
+        .filter((ex: any) => ex.notes && ex.notes.trim())
+        .map((ex: any) => ({
+          session_id: result.id,
+          exercise_id: ex.id,
+          notes: ex.notes,
+        }));
+
+      if (notesToInsert.length > 0) {
+        await supabase.from("session_exercise_notes").insert(notesToInsert);
+      }
+
+      return mapSession(result);
+    },
+
+    complete: async (id: string): Promise<WorkoutSession> => {
+      const { data: result, error } = await supabase
+        .from("workout_sessions")
+        .update({ completed_at: new Date().toISOString() })
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
+      return mapSession(result);
+    },
+
+    delete: async (id: string): Promise<void> => {
+      const { error } = await supabase.from("workout_sessions").delete().eq("id", id);
+      if (error) throw new Error(error.message);
+    },
+
+    logSet: async (data: CreateSessionSetLogInput): Promise<SessionSetLog> => {
+      const { data: result, error } = await supabase
+        .from("session_set_logs")
+        .insert({
+          session_id: data.sessionId,
+          exercise_id: data.exerciseId,
+          set_number: data.setNumber,
+          reps: data.reps,
+          weight_kg: data.weightKg,
+        })
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
+      return mapLog(result);
+    },
+
+    lastBySheet: async (
+      sheetId: string,
+    ): Promise<{ session: WorkoutSession; logs: SessionSetLog[] } | null> => {
+      const { data: sessions } = await supabase
+        .from("workout_sessions")
+        .select("*")
+        .eq("sheet_id", sheetId)
+        .not("completed_at", "is", null)
+        .order("completed_at", { ascending: false })
+        .limit(1);
+
+      if (!sessions || sessions.length === 0) return null;
+      const lastSession = mapSession(sessions[0]);
+
+      const { data: logRows } = await supabase
+        .from("session_set_logs")
+        .select("*")
+        .eq("session_id", lastSession.id);
+
+      return { session: lastSession, logs: (logRows ?? []).map(mapLog) };
+    },
+
+    getExerciseNotes: async (sessionId: string): Promise<SessionExerciseNote[]> => {
+      const { data, error } = await supabase
+        .from("session_exercise_notes")
+        .select("*")
+        .eq("session_id", sessionId);
+      if (error) throw new Error(error.message);
+      return (data ?? []).map(mapNote);
+    },
+
+    upsertExerciseNote: async (
+      data: UpsertSessionExerciseNoteInput,
+    ): Promise<SessionExerciseNote> => {
+      // Check if note already exists
+      const { data: existing } = await supabase
+        .from("session_exercise_notes")
+        .select("id")
+        .eq("session_id", data.sessionId)
+        .eq("exercise_id", data.exerciseId)
+        .limit(1);
+
+      if (existing && existing.length > 0) {
+        const { data: result, error } = await supabase
+          .from("session_exercise_notes")
+          .update({ notes: data.notes })
+          .eq("id", existing[0].id)
+          .select()
+          .single();
+        if (error) throw new Error(error.message);
+        return mapNote(result);
+      } else {
+        const { data: result, error } = await supabase
+          .from("session_exercise_notes")
+          .insert({
+            session_id: data.sessionId,
+            exercise_id: data.exerciseId,
+            notes: data.notes,
+          })
+          .select()
+          .single();
+        if (error) throw new Error(error.message);
+        return mapNote(result);
+      }
+    },
+  },
+};

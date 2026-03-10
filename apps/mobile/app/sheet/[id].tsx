@@ -24,7 +24,7 @@ import type { ExerciseFull, ExerciseSet } from "@bhmt3wp/shared";
 
 export default function SheetDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const sheetId = parseInt(id!);
+  const sheetId = id!;
   const router = useRouter();
   const { data: sheet, isLoading } = useSheet(sheetId);
   const createExercise = useCreateExercise();
@@ -55,7 +55,7 @@ export default function SheetDetailScreen() {
     );
   };
 
-  const handleDeleteExercise = (exId: number, name: string) => {
+  const handleDeleteExercise = (exId: string, name: string) => {
     if (Platform.OS === "web") {
       if (window.confirm(`Delete "${name}"?`)) {
         deleteExercise.mutate(exId);
@@ -68,7 +68,7 @@ export default function SheetDetailScreen() {
     }
   };
 
-  const handleAddSet = (exerciseId: number, currentSets: ExerciseSet[]) => {
+  const handleAddSet = (exerciseId: string, currentSets: ExerciseSet[]) => {
     const nextSetNumber = currentSets.length + 1;
     const lastSet = currentSets[currentSets.length - 1];
     createSet.mutate({
@@ -194,8 +194,8 @@ function ExerciseCard({
   onDelete: () => void;
   onUpdateExercise: (data: { notes?: string }) => void;
   onAddSet: () => void;
-  onUpdateSet: (setId: number, data: { reps?: number; weightKg?: number; restTimeSec?: number }) => void;
-  onDeleteSet: (setId: number) => void;
+  onUpdateSet: (setId: string, data: { reps?: number; weightKg?: number; restTimeSec?: number }) => void;
+  onDeleteSet: (setId: string) => void;
 }) {
   const [notes, setNotes] = useState(exercise.notes || "");
   const [isEditingNotes, setIsEditingNotes] = useState(false);

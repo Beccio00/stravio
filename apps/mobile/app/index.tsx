@@ -28,7 +28,7 @@ export default function HomeScreen() {
     );
   };
 
-  const handleDelete = (id: number, name: string) => {
+  const handleDelete = (id: string, name: string) => {
     if (Platform.OS === "web") {
       if (window.confirm(`Delete "${name}"?`)) {
         deleteSheet.mutate(id);
@@ -116,7 +116,7 @@ export default function HomeScreen() {
       ) : (
         <FlatList
           data={sheets}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={(item) => item.id}
           renderItem={renderSheet}
           contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 100 }}
           ListEmptyComponent={

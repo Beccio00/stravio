@@ -21,14 +21,14 @@ function confirmAction(title: string, message: string, onConfirm: () => void) {
 
 export default function WorkoutScreen() {
   const { id, sheetId } = useLocalSearchParams<{ id: string; sheetId: string }>();
-  const sessionId = parseInt(id!);
+  const sessionId = id!;
   const router = useRouter();
-  const { data: sheet } = useSheet(parseInt(sheetId!));
+  const { data: sheet } = useSheet(sheetId!);
   const { data: session } = useSession(sessionId);
   const logSet = useLogSessionSet();
   const completeSession = useCompleteSession();
-  const updateSet = useUpdateSet(parseInt(sheetId!));
-  const { data: lastSessionData } = useLastSessionBySheet(parseInt(sheetId!));
+  const updateSet = useUpdateSet(sheetId!);
+  const { data: lastSessionData } = useLastSessionBySheet(sheetId!);
   const { data: exerciseNotes } = useSessionExerciseNotes(sessionId);
   const upsertNote = useUpsertExerciseNote();
 
@@ -48,8 +48,8 @@ export default function WorkoutScreen() {
   // Editable values per set: key = "exerciseId-setNumber"
   const [editValues, setEditValues] = useState<Record<string, { kg: string; reps: string }>>({});
   // Exercise notes: key = exerciseId
-  const [notes, setNotes] = useState<Record<number, string>>({});
-  const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [restTimeLeft, setRestTimeLeft] = useState(0);
 
   // Initialize editable values from sheet template
@@ -75,7 +75,7 @@ export default function WorkoutScreen() {
   // Load existing exercise notes
   useEffect(() => {
     if (!exerciseNotes) return;
-    const notesMap: Record<number, string> = {};
+    const notesMap: Record<string, string> = {};
     for (const note of exerciseNotes) {
       notesMap[note.exerciseId] = note.notes;
     }
@@ -89,12 +89,12 @@ export default function WorkoutScreen() {
     return () => clearTimeout(timer);
   }, [restTimeLeft]);
 
-  const getEditValue = (exerciseId: number, setNumber: number) => {
+  const getEditValue = (exerciseId: string, setNumber: number) => {
     const key = `${exerciseId}-${setNumber}`;
     return editValues[key];
   };
 
-  const updateEditValue = (exerciseId: number, setNumber: number, field: "kg" | "reps", value: string) => {
+  const updateEditValue = (exerciseId: string, setNumber: number, field: "kg" | "reps", value: string) => {
     const key = `${exerciseId}-${setNumber}`;
     setEditValues((prev) => ({
       ...prev,
@@ -102,11 +102,11 @@ export default function WorkoutScreen() {
     }));
   };
 
-  const updateExerciseNote = (exerciseId: number, text: string) => {
+  const updateExerciseNote = (exerciseId: string, text: string) => {
     setNotes((prev) => ({ ...prev, [exerciseId]: text }));
   };
 
-  const handleBlurNote = (exerciseId: number) => {
+  const handleBlurNote = (exerciseId: string) => {
     const noteText = notes[exerciseId] || "";
     const trimmedNote = noteText.trim();
     // Save to backend

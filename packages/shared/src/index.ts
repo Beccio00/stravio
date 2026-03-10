@@ -1,5 +1,5 @@
 // ============================================
-// Shared types for the gym workout tracker app
+// Shared types for the Stravio workout tracker
 // ============================================
 
 // --- User / Auth ---
@@ -15,7 +15,8 @@ export interface UserProfile {
 
 // --- Workout Sheet (Scheda) ---
 export interface WorkoutSheet {
-  id: number;
+  id: string;
+  userId: string;
   name: string;
   description: string | null;
   createdAt: string;
@@ -34,8 +35,8 @@ export interface UpdateWorkoutSheetInput {
 
 // --- Exercise ---
 export interface Exercise {
-  id: number;
-  sheetId: number;
+  id: string;
+  sheetId: string;
   name: string;
   notes: string | null;
   orderIndex: number;
@@ -43,7 +44,7 @@ export interface Exercise {
 }
 
 export interface CreateExerciseInput {
-  sheetId: number;
+  sheetId: string;
   name: string;
   notes?: string;
   orderIndex?: number;
@@ -57,8 +58,8 @@ export interface UpdateExerciseInput {
 
 // --- Exercise Set ---
 export interface ExerciseSet {
-  id: number;
-  exerciseId: number;
+  id: string;
+  exerciseId: string;
   setNumber: number;
   reps: number;
   weightKg: number;
@@ -66,7 +67,7 @@ export interface ExerciseSet {
 }
 
 export interface CreateExerciseSetInput {
-  exerciseId: number;
+  exerciseId: string;
   setNumber: number;
   reps: number;
   weightKg: number;
@@ -82,23 +83,24 @@ export interface UpdateExerciseSetInput {
 
 // --- Workout Session (log of an actual workout) ---
 export interface WorkoutSession {
-  id: number;
-  sheetId: number;
+  id: string;
+  userId: string;
+  sheetId: string;
   startedAt: string;
   completedAt: string | null;
   notes: string | null;
 }
 
 export interface CreateWorkoutSessionInput {
-  sheetId: number;
+  sheetId: string;
   notes?: string;
 }
 
 // --- Session Set Log (actual performance per set) ---
 export interface SessionSetLog {
-  id: number;
-  sessionId: number;
-  exerciseId: number;
+  id: string;
+  sessionId: string;
+  exerciseId: string;
   setNumber: number;
   reps: number;
   weightKg: number;
@@ -106,8 +108,8 @@ export interface SessionSetLog {
 }
 
 export interface CreateSessionSetLogInput {
-  sessionId: number;
-  exerciseId: number;
+  sessionId: string;
+  exerciseId: string;
   setNumber: number;
   reps: number;
   weightKg: number;
@@ -115,16 +117,16 @@ export interface CreateSessionSetLogInput {
 
 // --- Session Exercise Note (notes for exercise during workout) ---
 export interface SessionExerciseNote {
-  id: number;
-  sessionId: number;
-  exerciseId: number;
+  id: string;
+  sessionId: string;
+  exerciseId: string;
   notes: string;
   updatedAt: string;
 }
 
 export interface UpsertSessionExerciseNoteInput {
-  sessionId: number;
-  exerciseId: number;
+  sessionId: string;
+  exerciseId: string;
   notes: string;
 }
 
@@ -153,7 +155,7 @@ export interface WorkoutSessionWithSheet extends WorkoutSession {
 }
 
 export interface SessionExerciseGroup {
-  exerciseId: number;
+  exerciseId: string;
   exerciseName: string;
   sets: SessionSetLog[];
 }
