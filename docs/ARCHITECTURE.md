@@ -60,9 +60,10 @@ bhmt3wp/
 - TypeScript interfaces use `string` for all ID fields
 - Route params from expo-router are used directly (no parseInt)
 
-### 4. Supabase Auth with roles
-- Two roles: `coach` and `allievo` (athlete)
-- Role stored in `profiles.role` with a CHECK constraint
+### 4. Supabase Auth (v1 single visible role)
+- Every signup is stored as `allievo` (athlete) in `profiles.role`
+- Role remains in schema for backward compatibility and future expansion
+- No role differentiation is exposed in the UI for v1
 - Profile auto-created via Postgres trigger on `auth.users` insert
 - Session persisted with `expo-secure-store` (native) or `localStorage` (web)
 

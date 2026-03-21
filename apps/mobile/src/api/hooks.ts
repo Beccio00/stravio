@@ -9,6 +9,7 @@ import type {
   UpdateExerciseSetInput,
   CreateWorkoutSessionInput,
   CreateSessionSetLogInput,
+  DeleteSessionSetLogInput,
   UpsertSessionExerciseNoteInput,
 } from "@bhmt3wp/shared";
 
@@ -164,6 +165,16 @@ export function useLogSessionSet() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: CreateSessionSetLogInput) => api.sessions.logSet(data),
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["sessions", vars.sessionId] });
+    },
+  });
+}
+
+export function useUnlogSessionSet() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: DeleteSessionSetLogInput) => api.sessions.unlogSet(data),
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ["sessions", vars.sessionId] });
     },

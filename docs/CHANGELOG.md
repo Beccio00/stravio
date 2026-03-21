@@ -10,11 +10,16 @@ All notable changes to Stravio.
 - **Root layout**: Removed SQLite migration step; app connects directly to Supabase
 - **Shared types**: Added `userId` field to `WorkoutSheet` and `WorkoutSession`
 - **Web support**: Expo web export works and deploys to Vercel
+- **Auth UX**: Removed role selector from signup UI
+- **Signup behavior**: New users are always created as `allievo`
+- **Home header**: Removed role badge, profile icon, and display name block from UI
+- **Workout sets**: `Done` is now reversible with `Undo` for accidental taps
 
 ### Added
 - `vercel.json` for Vercel deployment (SPA rewrite rules)
 - `docs/` folder with architecture, changelog, and decisions documentation
 - `.gitignore` entries for `.vscode/`, `data/`, `*.apk`
+- `LICENSE` file with AGPL-3.0 copyleft license
 
 ### Removed
 - SQLite database initialization from mobile app startup
@@ -27,10 +32,10 @@ All notable changes to Stravio.
 
 ### Added
 - **Supabase Auth**: Login/signup screens with email + password
-- **Role system**: Coach (`coach`) and Athlete (`allievo`) roles at signup
+- **Role system**: DB role field retained for compatibility, with `allievo` as current default UX
 - **Auth context**: `AuthProvider` + `useAuth()` hook with persistent sessions
 - **Auth gate**: Auto-redirect to login if not authenticated
-- **Profile display**: User avatar, name, and role badge on home screen
+- **Profile display**: User avatar and name on home screen
 - **Supabase schema**: `supabase/schema.sql` with 7 tables, RLS policies, triggers
 - **expo-secure-store**: Secure token storage on native devices
 

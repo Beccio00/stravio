@@ -1,7 +1,7 @@
 import { View, Text, TouchableOpacity, ScrollView, Alert, TextInput, Platform } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useSheet, useSession, useLogSessionSet, useCompleteSession, useLastSessionBySheet, useUpdateSet, useSessionExerciseNotes, useUpsertExerciseNote } from "../../src/api/hooks";
+import { useSheet, useSession, useLogSessionSet, useUnlogSessionSet, useCompleteSession, useLastSessionBySheet, useUpdateSet, useSessionExerciseNotes, useUpsertExerciseNote } from "../../src/api/hooks";
 import { useState, useEffect, useMemo } from "react";
 import type { ExerciseFull, ExerciseSet, SessionSetLog } from "@bhmt3wp/shared";
 
@@ -24,8 +24,9 @@ export default function WorkoutScreen() {
   const sessionId = id!;
   const router = useRouter();
   const { data: sheet } = useSheet(sheetId!);
-  const { data: session } = useSession(sessionId);
+  useSession(sessionId);
   const logSet = useLogSessionSet();
+  const unlogSet = useUnlogSessionSet();
   const completeSession = useCompleteSession();
   const updateSet = useUpdateSet(sheetId!);
   const { data: lastSessionData } = useLastSessionBySheet(sheetId!);
@@ -141,6 +142,31 @@ export default function WorkoutScreen() {
 
     setCompletedSets((prev) => new Set(prev).add(key));
     setRestTimeLeft(set.restTimeSec);
+  };
+
+  const handleUndoSet = async (exercise: ExerciseFull, set: ExerciseSet) => {
+    const key = `${exercise.id}-${set.setNumber}`;
+
+    try {
+      await unlogSet.mutateAsync({
+        sessionId,
+        exerciseId: exercise.id,
+        setNumber: set.setNumber,
+      });
+
+      setCompletedSets((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    } catch (e: any) {
+      const msg = e?.message || String(e);
+      if (Platform.OS === "web") {
+        window.alert("Error: " + msg);
+      } else {
+        Alert.alert("Error", msg);
+      }
+    }
   };
 
   const handleFinishWorkout = () => {
@@ -320,15 +346,20 @@ export default function WorkoutScreen() {
                       className={`w-20 py-2 rounded-xl items-center ${
                         isDone ? "bg-accent/20" : "bg-primary"
                       }`}
-                      onPress={() => handleCompleteSet(exercise, set)}
-                      disabled={isDone}
+                      onPress={() => {
+                        if (isDone) {
+                          handleUndoSet(exercise, set);
+                        } else {
+                          handleCompleteSet(exercise, set);
+                        }
+                      }}
                     >
                       <Text
                         className={`font-semibold text-sm ${
                           isDone ? "text-accent" : "text-white"
                         }`}
                       >
-                        {isDone ? "✓ Done" : "Done"}
+                        {isDone ? "Undo" : "Done"}
                       </Text>
                     </TouchableOpacity>
                   </View>

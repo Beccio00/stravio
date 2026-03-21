@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useAuth, type UserRole } from "../../src/contexts/AuthContext";
+import { useAuth } from "../../src/contexts/AuthContext";
 
 export default function SignupScreen() {
   const { signUp } = useAuth();
@@ -21,7 +21,6 @@ export default function SignupScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [role, setRole] = useState<UserRole>("allievo");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -45,7 +44,6 @@ export default function SignupScreen() {
     const { error: err } = await signUp(
       email.trim(),
       password,
-      role,
       displayName.trim() || undefined,
     );
     setLoading(false);
@@ -100,60 +98,6 @@ export default function SignupScreen() {
 
           {/* Form */}
           <View className="bg-surface rounded-2xl p-5 border border-border">
-            {/* Role selector */}
-            <Text className="text-text-secondary text-sm mb-2">I am a...</Text>
-            <View className="flex-row mb-5 gap-3">
-              <TouchableOpacity
-                className={`flex-1 py-3 rounded-xl items-center border ${
-                  role === "allievo"
-                    ? "bg-primary border-primary"
-                    : "bg-background border-border"
-                }`}
-                onPress={() => setRole("allievo")}
-              >
-                <Text className="text-lg mb-1">💪</Text>
-                <Text
-                  className={`font-semibold text-sm ${
-                    role === "allievo" ? "text-white" : "text-text-secondary"
-                  }`}
-                >
-                  Athlete
-                </Text>
-                <Text
-                  className={`text-xs ${
-                    role === "allievo" ? "text-white/70" : "text-text-muted"
-                  }`}
-                >
-                  (Allievo)
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                className={`flex-1 py-3 rounded-xl items-center border ${
-                  role === "coach"
-                    ? "bg-primary border-primary"
-                    : "bg-background border-border"
-                }`}
-                onPress={() => setRole("coach")}
-              >
-                <Text className="text-lg mb-1">🎯</Text>
-                <Text
-                  className={`font-semibold text-sm ${
-                    role === "coach" ? "text-white" : "text-text-secondary"
-                  }`}
-                >
-                  Coach
-                </Text>
-                <Text
-                  className={`text-xs ${
-                    role === "coach" ? "text-white/70" : "text-text-muted"
-                  }`}
-                >
-                  (Coach)
-                </Text>
-              </TouchableOpacity>
-            </View>
-
             <Text className="text-text-secondary text-sm mb-1.5">Display Name</Text>
             <TextInput
               className="bg-background text-text-primary rounded-xl px-4 py-3 text-base border border-border mb-4"

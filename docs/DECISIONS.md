@@ -120,22 +120,23 @@ APK files are kept in `apps/mobile/` as version snapshots:
 
 ---
 
-## D008: Two user roles (coach / allievo)
+## D008: Role kept in schema, hidden in v1 UX
 
 **Date**: 2026-03-10
 **Status**: Active
 
-**Roles**:
-- `allievo` (athlete): Default role, can create and manage their own sheets/workouts
-- `coach`: Can create sheets (future: assign to athletes, view athlete progress)
+**Current v1 behavior**:
+- Signup always writes `allievo` in user metadata.
+- `profiles.role` is still stored in Postgres with CHECK constraint compatibility.
+- The UI does not show or let users choose roles.
 
-Role is set at signup via `raw_user_meta_data` and stored in `profiles.role` with a CHECK constraint.
+Role is kept in schema to avoid breaking existing data and to support future multi-role features.
 
 ---
 
 ## Future Decisions (TODO)
 
 - **PowerSync**: Offline-first sync between local SQLite and Supabase
-- **Coach-athlete relationship**: Table for coach → athlete assignments
+- **Multi-role model**: Re-introduce role-specific flows only when assignment and permissions are fully designed
 - **Push notifications**: Workout reminders via Expo notifications
 - **Data export**: CSV/PDF export of workout history

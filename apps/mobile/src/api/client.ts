@@ -23,6 +23,7 @@ import type {
   UpdateExerciseSetInput,
   CreateWorkoutSessionInput,
   CreateSessionSetLogInput,
+  DeleteSessionSetLogInput,
   SessionSetLog,
   SessionExerciseNote,
   UpsertSessionExerciseNoteInput,
@@ -418,6 +419,16 @@ export const api = {
         .single();
       if (error) throw new Error(error.message);
       return mapLog(result);
+    },
+
+    unlogSet: async (data: DeleteSessionSetLogInput): Promise<void> => {
+      const { error } = await supabase
+        .from("session_set_logs")
+        .delete()
+        .eq("session_id", data.sessionId)
+        .eq("exercise_id", data.exerciseId)
+        .eq("set_number", data.setNumber);
+      if (error) throw new Error(error.message);
     },
 
     lastBySheet: async (

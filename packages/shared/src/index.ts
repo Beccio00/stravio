@@ -115,6 +115,12 @@ export interface CreateSessionSetLogInput {
   weightKg: number;
 }
 
+export interface DeleteSessionSetLogInput {
+  sessionId: string;
+  exerciseId: string;
+  setNumber: number;
+}
+
 // --- Session Exercise Note (notes for exercise during workout) ---
 export interface SessionExerciseNote {
   id: string;

@@ -23,7 +23,6 @@ interface AuthState {
   signUp: (
     email: string,
     password: string,
-    role: UserRole,
     displayName?: string,
   ) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
@@ -85,14 +84,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signUp = async (
     email: string,
     password: string,
-    role: UserRole,
     displayName?: string,
   ) => {
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: { role, display_name: displayName ?? email },
+        data: { role: "allievo", display_name: displayName ?? email },
       },
     });
     return { error: error?.message ?? null };

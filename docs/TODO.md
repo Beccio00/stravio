@@ -3,8 +3,8 @@
 ## High Priority
 
 - [ ] **PowerSync integration** – Offline-first sync between local SQLite cache and Supabase Postgres. This will allow the mobile app to work offline and sync when back online.
-- [ ] **Deploy web app to Vercel** – Run `vercel --prod` from root or connect GitHub repo to Vercel dashboard.
-- [ ] **Coach-athlete features** – Coaches can create sheets and assign them to athletes. Athletes see sheets assigned by their coach.
+- [x] **Deploy web app to Vercel** – Run `vercel --prod` from root or connect GitHub repo to Vercel dashboard.
+- [ ] **Multi-user assignments (post-v1)** – Introduce owner/assignee relationships only with clear permission model.
 
 ## Medium Priority
 
@@ -13,7 +13,7 @@
 - [ ] **Drag-to-reorder exercises** – Within a sheet, reorder exercises by dragging.
 - [ ] **Sheet templates** – Clone/duplicate an existing sheet.
 - [ ] **Push notifications** – Workout reminders (Expo Notifications).
-- [ ] **Profile settings screen** – Edit display name, change password, switch role.
+- [ ] **Profile settings screen** – Edit display name and change password.
 
 ## Low Priority
 
@@ -31,7 +31,7 @@
 - [x] Rest timer between sets
 - [x] Previous session weight/rep hints
 - [x] Exercise notes (template + per-session)
-- [x] Supabase Auth (login/signup with roles)
+- [x] Supabase Auth (login/signup)
 - [x] Auth gate (auto-redirect based on session)
 - [x] Persistent login (SecureStore on native, localStorage on web)
 - [x] Migrate from local SQLite to Supabase Postgres
