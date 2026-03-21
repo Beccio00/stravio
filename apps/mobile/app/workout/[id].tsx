@@ -1,7 +1,7 @@
 import { View, Text, TouchableOpacity, ScrollView, Alert, TextInput, Platform } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useSheet, useSession, useLogSessionSet, useCompleteSession, useLastSessionBySheet, useUpdateSet, useSessionExerciseNotes, useUpsertExerciseNote } from "../../src/api/hooks";
+import { useSheet, useSession, useLogSessionSet, useUnlogSessionSet, useCompleteSession, useLastSessionBySheet, useUpdateSet, useSessionExerciseNotes, useUpsertExerciseNote } from "../../src/api/hooks";
 import { useState, useEffect, useMemo } from "react";
 import type { ExerciseFull, ExerciseSet, SessionSetLog } from "@bhmt3wp/shared";
 
@@ -21,14 +21,15 @@ function confirmAction(title: string, message: string, onConfirm: () => void) {
 
 export default function WorkoutScreen() {
   const { id, sheetId } = useLocalSearchParams<{ id: string; sheetId: string }>();
-  const sessionId = parseInt(id!);
+  const sessionId = id!;
   const router = useRouter();
-  const { data: sheet } = useSheet(parseInt(sheetId!));
-  const { data: session } = useSession(sessionId);
+  const { data: sheet } = useSheet(sheetId!);
+  useSession(sessionId);
   const logSet = useLogSessionSet();
+  const unlogSet = useUnlogSessionSet();
   const completeSession = useCompleteSession();
-  const updateSet = useUpdateSet(parseInt(sheetId!));
-  const { data: lastSessionData } = useLastSessionBySheet(parseInt(sheetId!));
+  const updateSet = useUpdateSet(sheetId!);
+  const { data: lastSessionData } = useLastSessionBySheet(sheetId!);
   const { data: exerciseNotes } = useSessionExerciseNotes(sessionId);
   const upsertNote = useUpsertExerciseNote();
 
@@ -48,8 +49,8 @@ export default function WorkoutScreen() {
   // Editable values per set: key = "exerciseId-setNumber"
   const [editValues, setEditValues] = useState<Record<string, { kg: string; reps: string }>>({});
   // Exercise notes: key = exerciseId
-  const [notes, setNotes] = useState<Record<number, string>>({});
-  const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [restTimeLeft, setRestTimeLeft] = useState(0);
 
   // Initialize editable values from sheet template
@@ -75,7 +76,7 @@ export default function WorkoutScreen() {
   // Load existing exercise notes
   useEffect(() => {
     if (!exerciseNotes) return;
-    const notesMap: Record<number, string> = {};
+    const notesMap: Record<string, string> = {};
     for (const note of exerciseNotes) {
       notesMap[note.exerciseId] = note.notes;
     }
@@ -89,12 +90,12 @@ export default function WorkoutScreen() {
     return () => clearTimeout(timer);
   }, [restTimeLeft]);
 
-  const getEditValue = (exerciseId: number, setNumber: number) => {
+  const getEditValue = (exerciseId: string, setNumber: number) => {
     const key = `${exerciseId}-${setNumber}`;
     return editValues[key];
   };
 
-  const updateEditValue = (exerciseId: number, setNumber: number, field: "kg" | "reps", value: string) => {
+  const updateEditValue = (exerciseId: string, setNumber: number, field: "kg" | "reps", value: string) => {
     const key = `${exerciseId}-${setNumber}`;
     setEditValues((prev) => ({
       ...prev,
@@ -102,11 +103,11 @@ export default function WorkoutScreen() {
     }));
   };
 
-  const updateExerciseNote = (exerciseId: number, text: string) => {
+  const updateExerciseNote = (exerciseId: string, text: string) => {
     setNotes((prev) => ({ ...prev, [exerciseId]: text }));
   };
 
-  const handleBlurNote = (exerciseId: number) => {
+  const handleBlurNote = (exerciseId: string) => {
     const noteText = notes[exerciseId] || "";
     const trimmedNote = noteText.trim();
     // Save to backend
@@ -141,6 +142,31 @@ export default function WorkoutScreen() {
 
     setCompletedSets((prev) => new Set(prev).add(key));
     setRestTimeLeft(set.restTimeSec);
+  };
+
+  const handleUndoSet = async (exercise: ExerciseFull, set: ExerciseSet) => {
+    const key = `${exercise.id}-${set.setNumber}`;
+
+    try {
+      await unlogSet.mutateAsync({
+        sessionId,
+        exerciseId: exercise.id,
+        setNumber: set.setNumber,
+      });
+
+      setCompletedSets((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    } catch (e: any) {
+      const msg = e?.message || String(e);
+      if (Platform.OS === "web") {
+        window.alert("Error: " + msg);
+      } else {
+        Alert.alert("Error", msg);
+      }
+    }
   };
 
   const handleFinishWorkout = () => {
@@ -320,15 +346,20 @@ export default function WorkoutScreen() {
                       className={`w-20 py-2 rounded-xl items-center ${
                         isDone ? "bg-accent/20" : "bg-primary"
                       }`}
-                      onPress={() => handleCompleteSet(exercise, set)}
-                      disabled={isDone}
+                      onPress={() => {
+                        if (isDone) {
+                          handleUndoSet(exercise, set);
+                        } else {
+                          handleCompleteSet(exercise, set);
+                        }
+                      }}
                     >
                       <Text
                         className={`font-semibold text-sm ${
                           isDone ? "text-accent" : "text-white"
                         }`}
                       >
-                        {isDone ? "✓ Done" : "Done"}
+                        {isDone ? "Undo" : "Done"}
                       </Text>
                     </TouchableOpacity>
                   </View>

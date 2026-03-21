@@ -4,9 +4,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useSheets, useCreateSheet, useDeleteSheet } from "../src/api/hooks";
 import { useState } from "react";
 import type { WorkoutSheet } from "@bhmt3wp/shared";
+import { useAuth } from "../src/contexts/AuthContext";
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { signOut } = useAuth();
   const { data: sheets, isLoading, error } = useSheets();
   const createSheet = useCreateSheet();
   const deleteSheet = useDeleteSheet();
@@ -26,7 +28,7 @@ export default function HomeScreen() {
     );
   };
 
-  const handleDelete = (id: number, name: string) => {
+  const handleDelete = (id: string, name: string) => {
     if (Platform.OS === "web") {
       if (window.confirm(`Delete "${name}"?`)) {
         deleteSheet.mutate(id);
@@ -51,18 +53,18 @@ export default function HomeScreen() {
       activeOpacity={0.7}
     >
       <Text className="text-text-primary text-lg font-bold">{item.name}</Text>
-      {item.description && (
-        <Text className="text-text-secondary text-sm mt-1">{item.description}</Text>
-      )}
-      <Text className="text-text-muted text-xs mt-2">
-        {new Date(item.createdAt).toLocaleDateString("en-US")}
-      </Text>
     </TouchableOpacity>
   );
 
   return (
     <SafeAreaView className="flex-1 bg-background">
       <View className="px-5 pt-4 pb-2">
+        <View className="flex-row justify-end mb-3">
+          <TouchableOpacity onPress={signOut}>
+            <Text className="text-danger text-sm">Logout</Text>
+          </TouchableOpacity>
+        </View>
+
         <View className="flex-row items-center justify-between">
           <View>
             <Text className="text-text-primary text-3xl font-bold">🏋️ My Sheets</Text>
@@ -92,7 +94,7 @@ export default function HomeScreen() {
       ) : (
         <FlatList
           data={sheets}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={(item) => item.id}
           renderItem={renderSheet}
           contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 100 }}
           ListEmptyComponent={

@@ -1,4 +1,8 @@
 node_modules/
 dist/
 .expo/
+.vscode/
+data/
 apps/backend/data/
+eas.json.bak
+.vercel

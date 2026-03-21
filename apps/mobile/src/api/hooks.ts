@@ -9,6 +9,7 @@ import type {
   UpdateExerciseSetInput,
   CreateWorkoutSessionInput,
   CreateSessionSetLogInput,
+  DeleteSessionSetLogInput,
   UpsertSessionExerciseNoteInput,
 } from "@bhmt3wp/shared";
 
@@ -21,7 +22,7 @@ export function useSheets() {
   });
 }
 
-export function useSheet(id: number) {
+export function useSheet(id: string) {
   return useQuery({
     queryKey: ["sheets", id],
     queryFn: () => api.sheets.get(id),
@@ -40,7 +41,7 @@ export function useCreateSheet() {
 export function useUpdateSheet() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...data }: UpdateWorkoutSheetInput & { id: number }) =>
+    mutationFn: ({ id, ...data }: UpdateWorkoutSheetInput & { id: string }) =>
       api.sheets.update(id, data),
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ["sheets"] });
@@ -52,7 +53,7 @@ export function useUpdateSheet() {
 export function useDeleteSheet() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: number) => api.sheets.delete(id),
+    mutationFn: (id: string) => api.sheets.delete(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["sheets"] }),
   });
 }
@@ -69,10 +70,10 @@ export function useCreateExercise() {
   });
 }
 
-export function useUpdateExercise(sheetId: number) {
+export function useUpdateExercise(sheetId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...data }: UpdateExerciseInput & { id: number }) =>
+    mutationFn: ({ id, ...data }: UpdateExerciseInput & { id: string }) =>
       api.exercises.update(id, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["sheets", sheetId] });
@@ -80,10 +81,10 @@ export function useUpdateExercise(sheetId: number) {
   });
 }
 
-export function useDeleteExercise(sheetId: number) {
+export function useDeleteExercise(sheetId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: number) => api.exercises.delete(id),
+    mutationFn: (id: string) => api.exercises.delete(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["sheets", sheetId] });
     },
@@ -92,7 +93,7 @@ export function useDeleteExercise(sheetId: number) {
 
 // ==================== SETS ====================
 
-export function useCreateSet(sheetId: number) {
+export function useCreateSet(sheetId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: CreateExerciseSetInput) => api.sets.create(data),
@@ -102,10 +103,10 @@ export function useCreateSet(sheetId: number) {
   });
 }
 
-export function useUpdateSet(sheetId: number) {
+export function useUpdateSet(sheetId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...data }: UpdateExerciseSetInput & { id: number }) =>
+    mutationFn: ({ id, ...data }: UpdateExerciseSetInput & { id: string }) =>
       api.sets.update(id, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["sheets", sheetId] });
@@ -113,10 +114,10 @@ export function useUpdateSet(sheetId: number) {
   });
 }
 
-export function useDeleteSet(sheetId: number) {
+export function useDeleteSet(sheetId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: number) => api.sets.delete(id),
+    mutationFn: (id: string) => api.sets.delete(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["sheets", sheetId] });
     },
@@ -132,7 +133,7 @@ export function useSessions() {
   });
 }
 
-export function useSession(id: number) {
+export function useSession(id: string) {
   return useQuery({
     queryKey: ["sessions", id],
     queryFn: () => api.sessions.get(id),
@@ -151,7 +152,7 @@ export function useCreateSession() {
 export function useCompleteSession() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: number) => api.sessions.complete(id),
+    mutationFn: (id: string) => api.sessions.complete(id),
     onSuccess: (_, id) => {
       qc.invalidateQueries({ queryKey: ["sessions"] });
       qc.invalidateQueries({ queryKey: ["sessions", id] });
@@ -170,6 +171,16 @@ export function useLogSessionSet() {
   });
 }
 
+export function useUnlogSessionSet() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: DeleteSessionSetLogInput) => api.sessions.unlogSet(data),
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["sessions", vars.sessionId] });
+    },
+  });
+}
+
 export function useCompletedSessions() {
   return useQuery({
     queryKey: ["sessions", "completed"],
@@ -177,7 +188,7 @@ export function useCompletedSessions() {
   });
 }
 
-export function useLastSessionBySheet(sheetId: number) {
+export function useLastSessionBySheet(sheetId: string) {
   return useQuery({
     queryKey: ["sessions", "last-by-sheet", sheetId],
     queryFn: () => api.sessions.lastBySheet(sheetId),
@@ -185,7 +196,7 @@ export function useLastSessionBySheet(sheetId: number) {
   });
 }
 
-export function useSessionExerciseNotes(sessionId: number) {
+export function useSessionExerciseNotes(sessionId: string) {
   return useQuery({
     queryKey: ["sessions", sessionId, "exercise-notes"],
     queryFn: () => api.sessions.getExerciseNotes(sessionId),

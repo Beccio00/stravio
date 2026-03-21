@@ -1,12 +1,50 @@
 {
   "expo": {
-    "extra": {
-      "eas": {
-        "projectId": "ab50723b-a6bf-4378-8696-e3b32bab0bf5"
-      }
+    "name": "Stravio",
+    "slug": "stravio",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./apps/mobile/assets/icon.png",
+    "scheme": "stravio",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#1a1a2e"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.bhmt3wp.stravio"
     },
     "android": {
-      "package": "com.beccio00.bhmt3wp"
-    }
+      "adaptiveIcon": {
+        "backgroundColor": "#1a1a2e"
+      },
+      "package": "com.bhmt3wp.stravio"
+    },
+    "web": {
+      "bundler": "metro",
+      "favicon": "./apps/mobile/assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "kotlinVersion": "1.9.25"
+          }
+        }
+      ],
+      "expo-secure-store"
+    ],
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "409a6cbe-3f04-4863-9dd3-7d614ec338ef"
+      }
+    },
+    "owner": "beccio00"
   }
 }

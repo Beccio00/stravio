@@ -220,7 +220,7 @@ export default function HistoryScreen() {
       ) : (
         <FlatList
           data={monthSessions}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={(item) => item.id}
           renderItem={renderSession}
           contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
           ListHeaderComponent={

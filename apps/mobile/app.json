@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "GymTracker",
-    "slug": "gym-tracker",
+    "name": "Stravio",
+    "slug": "stravio",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "scheme": "gymtracker",
+    "scheme": "stravio",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "splash": {
@@ -13,13 +13,13 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.bhmt3wp.gymtracker"
+      "bundleIdentifier": "com.bhmt3wp.stravio"
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#1a1a2e"
       },
-      "package": "com.bhmt3wp.gymtracker"
+      "package": "com.bhmt3wp.stravio"
     },
     "web": {
       "bundler": "metro",
@@ -34,15 +34,17 @@
             "kotlinVersion": "1.9.25"
           }
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "extra": {
       "router": {
         "origin": false
       },
       "eas": {
-        "projectId": "11947817-431a-45b9-8d48-99b53d2b0983"
+        "projectId": "409a6cbe-3f04-4863-9dd3-7d614ec338ef"
       }
-    }
+    },
+    "owner": "beccio00"
   }
 }
