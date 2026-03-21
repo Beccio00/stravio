@@ -1,6 +1,6 @@
-# Stravio 🏋️
+# Stravio
 
-A gym workout tracker for athletes and coaches. Build workout sheets, log sessions in real-time, and track your progress — on Android and Web.
+Stravio is an open source workout sheet manager. Create workout sheets, log sessions in real-time, and track progress on Android, iOS, and Web.
 
 <p align="center">
   <img src="docs/screenshots/login.png" width="200" alt="Login" />
@@ -13,6 +13,15 @@ A gym workout tracker for athletes and coaches. Build workout sheets, log sessio
 
 ---
 
+## Vision
+
+Stravio is a free and open source alternative for workout sheet management.
+This v1 intentionally keeps the product model simple:
+
+- Every new account is stored as athlete (`allievo`) in the database.
+- No role differences are exposed in the UI.
+- Multi-role behavior is postponed to a future release.
+
 ## Features
 
 - **Workout Sheets** — Create and manage custom workout templates with exercises and sets
@@ -22,7 +31,7 @@ A gym workout tracker for athletes and coaches. Build workout sheets, log sessio
 - **Session History** — Calendar view with highlighted workout days, detailed session review
 - **Exercise Notes** — Add notes per exercise (template-level and session-level)
 - **Weight Auto-Sync** — Weight changes during a workout automatically update the sheet template
-- **Authentication** — Email/password login with two roles: Athlete and Coach
+- **Authentication** — Email/password login with persistent sessions
 - **Persistent Login** — Stay logged in across app restarts (SecureStore on mobile, localStorage on web)
 - **Cross-Platform** — Same codebase runs on Android (APK) and Web (Vercel)
 - **Per-User Data Isolation** — Row Level Security ensures you only see your own data
@@ -71,20 +80,55 @@ npm install
 ### Run Locally (Web)
 
 ```bash
-cd apps/mobile
-npx expo start --web
+npm run web -w apps/mobile
 ```
 
 Open http://localhost:8081 in your browser.
 
-### Build Android APK
+### Run Locally (Device/Emulator)
 
 ```bash
-cd apps/mobile
-eas build --platform android --profile preview --local
+npm run dev -w apps/mobile
+```
+
+### Build Android APK (v1 artifact)
+
+```bash
+eas build --platform android --profile preview
 ```
 
 The APK will be saved in the current directory as `build-*.apk`.
+
+### Build iOS Artifact
+
+```bash
+eas build --platform ios --profile production
+```
+
+Note: iOS builds require Apple credentials configured in EAS.
+
+### Download Builds From Expo
+
+After an EAS build finishes, artifacts are downloadable from the Expo dashboard:
+
+1. Open your Expo project on expo.dev.
+2. Go to Build and open the completed job.
+3. Download artifacts:
+  - Android preview profile -> APK
+  - Android production profile -> AAB
+  - iOS production profile -> IPA
+
+You can also list and open build links from CLI:
+
+```bash
+eas build:list
+```
+
+### Publish Update via Expo
+
+```bash
+eas update --branch production --message "v1 release"
+```
 
 ### Deploy to Vercel
 
@@ -134,7 +178,7 @@ The Supabase Postgres database has 7 tables:
 
 | Table | Purpose |
 |-------|---------|
-| `profiles` | User profiles (role, display name) — auto-created on signup |
+| `profiles` | User profiles (role, display name) — role currently defaulted to `allievo` |
 | `workout_sheets` | Workout templates owned by a user |
 | `exercises` | Exercises within a sheet |
 | `exercise_sets` | Template sets (reps, weight, rest time) |
@@ -153,7 +197,7 @@ Place your app screenshots in `docs/screenshots/`:
 | File | Screen |
 |------|--------|
 | `login.png` | Login screen |
-| `signup.png` | Signup with role selector |
+| `signup.png` | Signup screen |
 | `home.png` | Home screen (sheet list) |
 | `sheet.png` | Sheet detail (exercises + sets) |
 | `workout.png` | Active workout session |
@@ -168,10 +212,36 @@ Place your app screenshots in `docs/screenshots/`:
 - [Decisions](docs/DECISIONS.md) — Technical decision records
 - [Changelog](docs/CHANGELOG.md) — Version history
 - [TODO](docs/TODO.md) — Roadmap and task tracking
+- [Release Guide](docs/RELEASE.md) — Build and publish flow for v1
 
----
+## Contributing
+
+Contributions are welcome.
+
+1. Fork the repository.
+2. Create a feature branch.
+3. Commit your changes.
+4. Open a pull request.
+
+Example flow:
+
+```bash
+git checkout -b feat/my-change
+git add .
+git commit -m "feat: my change"
+git push origin feat/my-change
+```
+
+## Versioning
+
+This project follows Semantic Versioning.
+
+- `v1.0.0`: first stable release
+- `v1.0.1`: patch fixes
+- `v1.1.0`: backward-compatible features
+- `v2.0.0`: breaking changes
 
 ## License
 
-Private project.
-    └────────┘    └──────────┘
+This project is licensed under GNU Affero General Public License v3.0 (AGPL-3.0).
+See [LICENSE](LICENSE).
