@@ -23,7 +23,13 @@ export async function setRoutes(app: FastifyInstance) {
     const { exerciseId, setNumber, reps, weightKg, restTimeSec } = req.body;
     const [result] = await db
       .insert(schema.exerciseSets)
-      .values({ exerciseId, setNumber, reps, weightKg, restTimeSec })
+      .values({
+        exerciseId: parseInt(exerciseId),
+        setNumber,
+        reps,
+        weightKg,
+        restTimeSec,
+      })
       .returning();
 
     return reply.status(201).send({ data: result });

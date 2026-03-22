@@ -24,7 +24,7 @@ export async function exerciseRoutes(app: FastifyInstance) {
     const [result] = await db
       .insert(schema.exercises)
       .values({
-        sheetId,
+        sheetId: parseInt(sheetId),
         name,
         notes: notes ?? null,
         orderIndex: orderIndex ?? 0,

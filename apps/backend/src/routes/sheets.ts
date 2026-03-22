@@ -4,9 +4,6 @@ import { eq } from "drizzle-orm";
 import type {
   CreateWorkoutSheetInput,
   UpdateWorkoutSheetInput,
-  WorkoutSheet,
-  WorkoutSheetFull,
-  ExerciseFull,
 } from "@bhmt3wp/shared";
 
 export async function sheetRoutes(app: FastifyInstance) {
@@ -36,7 +33,7 @@ export async function sheetRoutes(app: FastifyInstance) {
       .where(eq(schema.exercises.sheetId, id))
       .orderBy(schema.exercises.orderIndex);
 
-    const exercisesWithSets: ExerciseFull[] = await Promise.all(
+    const exercisesWithSets = await Promise.all(
       exerciseRows.map(async (ex) => {
         const sets = await db
           .select()
@@ -47,7 +44,7 @@ export async function sheetRoutes(app: FastifyInstance) {
       })
     );
 
-    const result: WorkoutSheetFull = { ...sheet, exercises: exercisesWithSets };
+    const result = { ...sheet, exercises: exercisesWithSets };
     return { data: result };
   });
 

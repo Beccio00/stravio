@@ -7,3 +7,4 @@ apps/backend/data/
 *.apk
 eas.json.bak
 .vercel
+.vscode

@@ -91,16 +91,17 @@ export async function sessionRoutes(app: FastifyInstance) {
   // POST /api/sessions - Start a new workout session
   app.post<{ Body: CreateWorkoutSessionInput }>("/api/sessions", async (req, reply) => {
     const { sheetId, notes } = req.body;
+    const numericSheetId = parseInt(sheetId);
     const [result] = await db
       .insert(schema.workoutSessions)
-      .values({ sheetId, notes: notes ?? null })
+      .values({ sheetId: numericSheetId, notes: notes ?? null })
       .returning();
 
     // Copy exercise template notes to session notes
     const exercises = await db
       .select()
       .from(schema.exercises)
-      .where(eq(schema.exercises.sheetId, sheetId));
+      .where(eq(schema.exercises.sheetId, numericSheetId));
 
     const notesToInsert = exercises
       .filter(ex => ex.notes && ex.notes.trim())
@@ -141,7 +142,13 @@ export async function sessionRoutes(app: FastifyInstance) {
     const { sessionId, exerciseId, setNumber, reps, weightKg } = req.body;
     const [result] = await db
       .insert(schema.sessionSetLogs)
-      .values({ sessionId, exerciseId, setNumber, reps, weightKg })
+      .values({
+        sessionId: parseInt(sessionId),
+        exerciseId: parseInt(exerciseId),
+        setNumber,
+        reps,
+        weightKg,
+      })
       .returning();
 
     return reply.status(201).send({ data: result });
@@ -200,6 +207,8 @@ export async function sessionRoutes(app: FastifyInstance) {
     "/api/session-exercise-notes",
     async (req, reply) => {
       const { sessionId, exerciseId, notes } = req.body;
+      const numericSessionId = parseInt(sessionId);
+      const numericExerciseId = parseInt(exerciseId);
 
       // Check if note already exists
       const [existing] = await db
@@ -207,8 +216,8 @@ export async function sessionRoutes(app: FastifyInstance) {
         .from(schema.sessionExerciseNotes)
         .where(
           and(
-            eq(schema.sessionExerciseNotes.sessionId, sessionId),
-            eq(schema.sessionExerciseNotes.exerciseId, exerciseId)
+            eq(schema.sessionExerciseNotes.sessionId, numericSessionId),
+            eq(schema.sessionExerciseNotes.exerciseId, numericExerciseId)
           )
         )
         .limit(1);
@@ -225,7 +234,11 @@ export async function sessionRoutes(app: FastifyInstance) {
         // Insert new note
         const [result] = await db
           .insert(schema.sessionExerciseNotes)
-          .values({ sessionId, exerciseId, notes })
+          .values({
+            sessionId: numericSessionId,
+            exerciseId: numericExerciseId,
+            notes,
+          })
           .returning();
         return reply.status(201).send({ data: result });
       }
