@@ -51,6 +51,12 @@ This v1 intentionally keeps the product model simple:
 
 ---
 
+## APK
+the apk is aviable in this link: https://expo.dev/accounts/beccio00/projects/stravio/builds/448eb65b-b181-45ae-913f-f3afbc0f335c
+
+## Web App 
+Web app is deployed on Vercel: https://stravio-project.vercel.app/
+
 ## Getting Started
 
 ### Prerequisites
@@ -64,8 +70,8 @@ This v1 intentionally keeps the product model simple:
 
 ```bash
 # 1. Clone and install
-git clone <repo-url>
-cd bhmt3wp
+git clone https://github.com/Beccio00/stravio
+cd stravio
 npm install
 
 # 2. Set up Supabase
@@ -146,7 +152,7 @@ vercel --prod
 ## Project Structure
 
 ```
-bhmt3wp/
+stravio/
 ├── apps/
 │   ├── mobile/              # Expo universal app (Android + Web)
 │   │   ├── app/             # File-based routes (expo-router)
