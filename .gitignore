@@ -4,5 +4,6 @@ dist/
 .vscode/
 data/
 apps/backend/data/
+*.apk
 eas.json.bak
 .vercel
