@@ -9,7 +9,8 @@
   "scripts": {
     "dev:backend": "npm run dev -w apps/backend",
     "dev:mobile": "npm run dev -w apps/mobile",
-    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:mobile\"",
+    "dev": "npm run dev:mobile",
+    "dev:full": "concurrently \"npm run dev:backend\" \"npm run dev:mobile\"",
     "db:generate": "npm run db:generate -w apps/backend",
     "db:migrate": "npm run db:migrate -w apps/backend"
   },

@@ -88,7 +88,7 @@ export default function HomeScreen() {
       ) : error ? (
         <View className="flex-1 items-center justify-center px-5">
           <Text className="text-danger text-lg text-center">
-            Server connection error.{"\n"}Make sure the backend is running.
+            Data loading error.{"\n"}Check internet and Supabase configuration.
           </Text>
         </View>
       ) : (

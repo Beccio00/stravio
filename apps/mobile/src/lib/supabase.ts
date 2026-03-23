@@ -30,11 +30,17 @@ if (Platform.OS !== "web") {
 // ---------------------------------------------------------------------------
 // Supabase client
 // ---------------------------------------------------------------------------
-const SUPABASE_URL = "https://dqtfhrdkikxfxnifnsqs.supabase.co";
-const SUPABASE_ANON_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRxdGZocmRraWt4ZnhuaWZuc3FzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNDIzNjMsImV4cCI6MjA4ODcxODM2M30.SRxIhAQH2RqBcsTlTOTuq6QmFuItxfDXwYgRuoyXn_8";
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const SUPABASE_PUBLISHABLE_KEY =
+  process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+  throw new Error(
+    "Missing Supabase env vars: set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY (or EXPO_PUBLIC_SUPABASE_ANON_KEY)",
+  );
+}
+
+export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
     storage,
     autoRefreshToken: true,

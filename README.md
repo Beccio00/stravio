@@ -80,7 +80,8 @@ npm install
 #    - Go to Authentication → Providers → Email → disable "Confirm email"
 
 # 3. Configure Supabase credentials
-#    Edit apps/mobile/src/lib/supabase.ts with your project URL and anon key
+#    Copy apps/mobile/.env.example to apps/mobile/.env
+#    and set EXPO_PUBLIC_SUPABASE_URL + EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 ```
 
 ### Run Locally (Web)

@@ -26,7 +26,7 @@ begin
   insert into public.profiles (id, role, display_name)
   values (
     new.id,
-    coalesce(new.raw_user_meta_data ->> 'role', 'allievo'),
+    'allievo',
     coalesce(new.raw_user_meta_data ->> 'display_name', new.email)
   );
   return new;
@@ -247,11 +247,24 @@ create policy "Users can view own sessions"
 
 create policy "Users can insert own sessions"
   on public.workout_sessions for insert
-  with check (auth.uid() = user_id);
+  with check (
+    auth.uid() = user_id
+    and exists (
+      select 1 from public.workout_sheets ws
+      where ws.id = sheet_id and ws.user_id = auth.uid()
+    )
+  );
 
 create policy "Users can update own sessions"
   on public.workout_sessions for update
-  using (auth.uid() = user_id);
+  using (auth.uid() = user_id)
+  with check (
+    auth.uid() = user_id
+    and exists (
+      select 1 from public.workout_sheets ws
+      where ws.id = sheet_id and ws.user_id = auth.uid()
+    )
+  );
 
 create policy "Users can delete own sessions"
   on public.workout_sessions for delete
@@ -273,8 +286,12 @@ create policy "Users can insert logs in own sessions"
   on public.session_set_logs for insert
   with check (
     exists (
-      select 1 from public.workout_sessions ws
-      where ws.id = session_id and ws.user_id = auth.uid()
+      select 1
+      from public.workout_sessions ws
+      join public.exercises e on e.id = exercise_id
+      where ws.id = session_id
+        and ws.user_id = auth.uid()
+        and e.sheet_id = ws.sheet_id
     )
   );
 
@@ -284,6 +301,16 @@ create policy "Users can update logs in own sessions"
     exists (
       select 1 from public.workout_sessions ws
       where ws.id = session_id and ws.user_id = auth.uid()
+    )
+  )
+  with check (
+    exists (
+      select 1
+      from public.workout_sessions ws
+      join public.exercises e on e.id = exercise_id
+      where ws.id = session_id
+        and ws.user_id = auth.uid()
+        and e.sheet_id = ws.sheet_id
     )
   );
 
@@ -312,8 +339,12 @@ create policy "Users can insert notes in own sessions"
   on public.session_exercise_notes for insert
   with check (
     exists (
-      select 1 from public.workout_sessions ws
-      where ws.id = session_id and ws.user_id = auth.uid()
+      select 1
+      from public.workout_sessions ws
+      join public.exercises e on e.id = exercise_id
+      where ws.id = session_id
+        and ws.user_id = auth.uid()
+        and e.sheet_id = ws.sheet_id
     )
   );
 
@@ -323,6 +354,16 @@ create policy "Users can update notes in own sessions"
     exists (
       select 1 from public.workout_sessions ws
       where ws.id = session_id and ws.user_id = auth.uid()
+    )
+  )
+  with check (
+    exists (
+      select 1
+      from public.workout_sessions ws
+      join public.exercises e on e.id = exercise_id
+      where ws.id = session_id
+        and ws.user_id = auth.uid()
+        and e.sheet_id = ws.sheet_id
     )
   );
 
@@ -359,3 +400,10 @@ create trigger set_workout_sheets_updated_at
 create trigger set_session_exercise_notes_updated_at
   before update on public.session_exercise_notes
   for each row execute function public.set_updated_at();
+
+-- Integrity constraints to avoid duplicates and race-condition duplicates
+create unique index if not exists uq_session_set_logs_unique_set
+  on public.session_set_logs (session_id, exercise_id, set_number);
+
+create unique index if not exists uq_session_exercise_notes_unique_pair
+  on public.session_exercise_notes (session_id, exercise_id);
