@@ -52,7 +52,7 @@ This v1 intentionally keeps the product model simple:
 ---
 
 ## APK
-the apk is aviable in this link: https://expo.dev/accounts/beccio00/projects/stravio/builds/448eb65b-b181-45ae-913f-f3afbc0f335c
+the apk is aviable in this link: https://expo.dev/accounts/beccio00/projects/stravio/builds/9443dd66-7a95-44f0-869b-dca5bb408bb3
 
 ## Web App 
 Web app is deployed on Vercel: https://stravio-project.vercel.app/
