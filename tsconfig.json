@@ -12,8 +12,8 @@
   "include": [
     "app/**/*.ts",
     "app/**/*.tsx",
-    "src/**/*.ts",
-    "src/**/*.tsx",
+    "apps/mobile/src/**/*.ts",
+    "apps/mobile/src/**/*.tsx",
     "apps/mobile/nativewind-env.d.ts"
   ]
 }
