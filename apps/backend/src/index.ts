@@ -10,10 +10,40 @@ const app = Fastify({
   logger: true,
 });
 
+const ENABLE_LEGACY_BACKEND = process.env.ENABLE_LEGACY_BACKEND === "true";
+const DEFAULT_ALLOWED_ORIGINS = [
+  "http://localhost:8081",
+  "http://127.0.0.1:8081",
+  "http://localhost:19006",
+  "http://127.0.0.1:19006",
+];
+
 async function start() {
-  // CORS - allow requests from Expo dev server and web
+  if (!ENABLE_LEGACY_BACKEND) {
+    throw new Error(
+      [
+        "Legacy backend is disabled for security reasons.",
+        "This project uses Supabase directly.",
+        "If you still need this legacy server for local-only debugging, run with:",
+        "ENABLE_LEGACY_BACKEND=true npm run dev -w apps/backend",
+      ].join(" "),
+    );
+  }
+
+  const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? DEFAULT_ALLOWED_ORIGINS.join(","))
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean);
+
+  // Restrictive CORS to reduce accidental exposure
   await app.register(cors, {
-    origin: true,
+    origin: (origin, cb) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        cb(null, true);
+        return;
+      }
+      cb(new Error("CORS origin not allowed"), false);
+    },
     methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
   });
 
@@ -30,7 +60,7 @@ async function start() {
   app.get("/api/health", async () => ({ status: "ok" }));
 
   const port = parseInt(process.env.PORT ?? "3000");
-  const host = process.env.HOST ?? "0.0.0.0";
+  const host = process.env.HOST ?? "127.0.0.1";
 
   await app.listen({ port, host });
   console.log(`🏋️ Gym API running at http://${host}:${port}`);

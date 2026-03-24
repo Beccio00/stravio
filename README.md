@@ -52,7 +52,7 @@ This v1 intentionally keeps the product model simple:
 ---
 
 ## APK
-the apk is aviable in this link: https://expo.dev/accounts/beccio00/projects/stravio/builds/448eb65b-b181-45ae-913f-f3afbc0f335c
+the apk is aviable in this link: https://expo.dev/accounts/beccio00/projects/stravio/builds/065a71b4-c4de-4cbc-9c57-ea982e81962e
 
 ## Web App 
 Web app is deployed on Vercel: https://stravio-project.vercel.app/
@@ -80,7 +80,8 @@ npm install
 #    - Go to Authentication → Providers → Email → disable "Confirm email"
 
 # 3. Configure Supabase credentials
-#    Edit apps/mobile/src/lib/supabase.ts with your project URL and anon key
+#    Copy apps/mobile/.env.example to apps/mobile/.env
+#    and set EXPO_PUBLIC_SUPABASE_URL + EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 ```
 
 ### Run Locally (Web)

@@ -2,7 +2,7 @@
   "expo": {
     "name": "Stravio",
     "slug": "stravio",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./apps/mobile/assets/icon.png",
     "scheme": "stravio",
