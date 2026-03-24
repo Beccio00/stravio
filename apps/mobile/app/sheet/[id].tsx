@@ -19,7 +19,7 @@ import {
   useDeleteSet,
   useCreateSession,
 } from "../../src/api/hooks";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ExerciseFull, ExerciseSet } from "@bhmt3wp/shared";
 
 export default function SheetDetailScreen() {
@@ -290,14 +290,57 @@ function SetRow({
   const [reps, setReps] = useState(set.reps.toString());
   const [rest, setRest] = useState(set.restTimeSec.toString());
 
-  const handleSave = () => {
+  const latestRef = useRef({ kg, reps, rest, isEditing });
+
+  useEffect(() => {
+    latestRef.current = { kg, reps, rest, isEditing };
+  }, [kg, reps, rest, isEditing]);
+
+  useEffect(() => {
+    if (!isEditing) {
+      setKg(set.weightKg.toString());
+      setReps(set.reps.toString());
+      setRest(set.restTimeSec.toString());
+    }
+  }, [set.weightKg, set.reps, set.restTimeSec, isEditing]);
+
+  const saveIfChanged = (values: { kg: string; reps: string; rest: string }) => {
+    const nextWeight = parseFloat(values.kg) || 0;
+    const nextReps = parseInt(values.reps) || 0;
+    const nextRest = parseInt(values.rest) || 60;
+
+    if (
+      nextWeight === set.weightKg &&
+      nextReps === set.reps &&
+      nextRest === set.restTimeSec
+    ) {
+      return;
+    }
+
     onUpdate({
-      weightKg: parseFloat(kg) || 0,
-      reps: parseInt(reps) || 0,
-      restTimeSec: parseInt(rest) || 60,
+      weightKg: nextWeight,
+      reps: nextReps,
+      restTimeSec: nextRest,
     });
+  };
+
+  const handleSave = () => {
+    saveIfChanged({ kg, reps, rest });
     setIsEditing(false);
   };
+
+  useEffect(() => {
+    return () => {
+      const latest = latestRef.current;
+      if (latest.isEditing) {
+        saveIfChanged({
+          kg: latest.kg,
+          reps: latest.reps,
+          rest: latest.rest,
+        });
+      }
+    };
+  }, [set.weightKg, set.reps, set.restTimeSec]);
 
   if (isEditing) {
     return (
