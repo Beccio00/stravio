@@ -1,7 +1,7 @@
 import { View, Text, TouchableOpacity, FlatList, TextInput, Alert, Platform } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useSheets, useCreateSheet, useDeleteSheet } from "../src/api/hooks";
+import { useSheets, useCreateSheet, useDeleteSheet, useUpdateSheet } from "../src/api/hooks";
 import { useState } from "react";
 import type { WorkoutSheet } from "@bhmt3wp/shared";
 import { useAuth } from "../src/contexts/AuthContext";
@@ -12,8 +12,11 @@ export default function HomeScreen() {
   const { data: sheets, isLoading, error } = useSheets();
   const createSheet = useCreateSheet();
   const deleteSheet = useDeleteSheet();
+  const updateSheet = useUpdateSheet();
   const [newSheetName, setNewSheetName] = useState("");
   const [showCreate, setShowCreate] = useState(false);
+  const [editingSheetId, setEditingSheetId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
 
   const handleCreate = () => {
     if (!newSheetName.trim()) return;
@@ -45,16 +48,85 @@ export default function HomeScreen() {
     }
   };
 
-  const renderSheet = ({ item }: { item: WorkoutSheet }) => (
-    <TouchableOpacity
-      className="bg-surface rounded-2xl p-5 mb-3 border border-border"
-      onPress={() => router.push(`/sheet/${item.id}`)}
-      onLongPress={() => handleDelete(item.id, item.name)}
-      activeOpacity={0.7}
-    >
-      <Text className="text-text-primary text-lg font-bold">{item.name}</Text>
-    </TouchableOpacity>
-  );
+  const beginRename = (item: WorkoutSheet) => {
+    setEditingSheetId(item.id);
+    setRenameDraft(item.name);
+  };
+
+  const applyRename = () => {
+    if (!editingSheetId) return;
+    const trimmed = renameDraft.trim();
+    if (!trimmed) return;
+    const currentName = sheets?.find((s) => s.id === editingSheetId)?.name;
+    if (trimmed === currentName) {
+      setEditingSheetId(null);
+      return;
+    }
+    updateSheet.mutate(
+      { id: editingSheetId, name: trimmed },
+      {
+        onSuccess: () => setEditingSheetId(null),
+        onError: (err) => {
+          const msg = err instanceof Error ? err.message : "Could not rename sheet";
+          if (Platform.OS === "web") {
+            window.alert(msg);
+          } else {
+            Alert.alert("Rename failed", msg);
+          }
+        },
+      }
+    );
+  };
+
+  const renderSheet = ({ item }: { item: WorkoutSheet }) => {
+    const isEditing = editingSheetId === item.id;
+    return (
+      <View className="bg-surface rounded-2xl p-5 mb-3 border border-border">
+        <View className="flex-row items-center gap-2">
+          {isEditing ? (
+            <>
+              <TextInput
+                className="flex-1 min-w-0 bg-background text-text-primary text-lg font-bold rounded-xl px-3 py-2 border border-border"
+                value={renameDraft}
+                onChangeText={setRenameDraft}
+                placeholder="Sheet name..."
+                placeholderTextColor="#6b6b7b"
+                autoFocus
+                editable={!updateSheet.isPending}
+                onSubmitEditing={applyRename}
+              />
+              <TouchableOpacity
+                onPress={applyRename}
+                disabled={updateSheet.isPending}
+                className="px-2 py-2"
+                accessibilityLabel="Save sheet name"
+              >
+                <Text className="text-accent font-extrabold text-xl">✓</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <TouchableOpacity
+                className="flex-1 shrink min-w-0"
+                onPress={() => router.push(`/sheet/${item.id}`)}
+                onLongPress={() => handleDelete(item.id, item.name)}
+                activeOpacity={0.7}
+              >
+                <Text className="text-text-primary text-lg font-bold">{item.name}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => beginRename(item)}
+                className="px-2 py-2"
+                accessibilityLabel="Edit sheet name"
+              >
+                <Text className="text-text-secondary text-lg">✎</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-background">
@@ -96,6 +168,7 @@ export default function HomeScreen() {
           data={sheets}
           keyExtractor={(item) => item.id}
           renderItem={renderSheet}
+          extraData={[editingSheetId, renameDraft, updateSheet.isPending]}
           contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 100 }}
           ListEmptyComponent={
             <View className="items-center justify-center pt-20">
