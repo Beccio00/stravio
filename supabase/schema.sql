@@ -47,6 +47,7 @@ create table if not exists public.workout_sheets (
   user_id     uuid not null references auth.users(id) on delete cascade,
   name        text not null,
   description text,
+  order_index integer not null default 0,
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );
@@ -115,6 +116,7 @@ create table if not exists public.session_exercise_notes (
 -- 8. Indexes
 -- ============================================
 create index if not exists idx_workout_sheets_user    on public.workout_sheets(user_id);
+create index if not exists idx_workout_sheets_user_order on public.workout_sheets(user_id, order_index);
 create index if not exists idx_exercises_sheet        on public.exercises(sheet_id);
 create index if not exists idx_exercise_sets_exercise on public.exercise_sets(exercise_id);
 create index if not exists idx_sessions_user          on public.workout_sessions(user_id);

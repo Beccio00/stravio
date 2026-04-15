@@ -1,6 +1,7 @@
 import "../global.css";
 import { useEffect } from "react";
 import { View, ActivityIndicator } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { StatusBar } from "expo-status-bar";
@@ -54,25 +55,27 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 // ---------------------------------------------------------------------------
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <QueryClientProvider client={queryClient}>
-        <SafeAreaProvider>
-          <StatusBar style="light" />
-          <AuthGate>
-            <Stack
-              screenOptions={{
-                headerStyle: { backgroundColor: "#1a1a2e" },
-                headerTintColor: "#ffffff",
-                headerTitleStyle: { fontWeight: "bold" },
-                contentStyle: { backgroundColor: "#0f0f1a" },
-              }}
-            >
-              {/* Hide the header for the auth group */}
-              <Stack.Screen name="auth" options={{ headerShown: false }} />
-            </Stack>
-          </AuthGate>
-        </SafeAreaProvider>
-      </QueryClientProvider>
-    </AuthProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <AuthProvider>
+        <QueryClientProvider client={queryClient}>
+          <SafeAreaProvider>
+            <StatusBar style="light" />
+            <AuthGate>
+              <Stack
+                screenOptions={{
+                  headerStyle: { backgroundColor: "#1a1a2e" },
+                  headerTintColor: "#ffffff",
+                  headerTitleStyle: { fontWeight: "bold" },
+                  contentStyle: { backgroundColor: "#0f0f1a" },
+                }}
+              >
+                {/* Hide the header for the auth group */}
+                <Stack.Screen name="auth" options={{ headerShown: false }} />
+              </Stack>
+            </AuthGate>
+          </SafeAreaProvider>
+        </QueryClientProvider>
+      </AuthProvider>
+    </GestureHandlerRootView>
   );
 }
