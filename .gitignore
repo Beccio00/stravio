@@ -11,3 +11,4 @@ apps/backend/data/
 eas.json.bak
 .vercel
 .vscode
+.DS_Store

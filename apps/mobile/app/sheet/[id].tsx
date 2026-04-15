@@ -11,6 +11,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   useSheet,
+  useUpdateSheet,
   useCreateExercise,
   useDeleteExercise,
   useUpdateExercise,
@@ -34,9 +35,41 @@ export default function SheetDetailScreen() {
   const updateSet = useUpdateSet(sheetId);
   const deleteSet = useDeleteSet(sheetId);
   const createSession = useCreateSession();
+  const updateSheet = useUpdateSheet();
 
   const [newExerciseName, setNewExerciseName] = useState("");
   const [showAddExercise, setShowAddExercise] = useState(false);
+  const [isEditingSheetName, setIsEditingSheetName] = useState(false);
+  const [sheetNameDraft, setSheetNameDraft] = useState("");
+
+  const beginEditSheetName = () => {
+    setSheetNameDraft(sheet?.name ?? "");
+    setIsEditingSheetName(true);
+  };
+
+  const applySheetName = () => {
+    if (!sheet) return;
+    const trimmed = sheetNameDraft.trim();
+    if (!trimmed) return;
+    if (trimmed === sheet.name) {
+      setIsEditingSheetName(false);
+      return;
+    }
+    updateSheet.mutate(
+      { id: sheetId, name: trimmed },
+      {
+        onSuccess: () => setIsEditingSheetName(false),
+        onError: (err) => {
+          const msg = err instanceof Error ? err.message : "Could not rename sheet";
+          if (Platform.OS === "web") {
+            window.alert(msg);
+          } else {
+            Alert.alert("Rename failed", msg);
+          }
+        },
+      }
+    );
+  };
 
   const handleAddExercise = () => {
     if (!newExerciseName.trim()) return;
@@ -115,7 +148,47 @@ export default function SheetDetailScreen() {
           <TouchableOpacity onPress={() => router.back()}>
             <Text className="text-primary text-base mb-1">← Back</Text>
           </TouchableOpacity>
-          <Text className="text-text-primary text-2xl font-bold">{sheet.name}</Text>
+          <View className="flex-row items-center gap-2 mt-0.5">
+            {isEditingSheetName ? (
+              <>
+                <TextInput
+                  className="flex-1 bg-background text-text-primary text-2xl font-bold rounded-xl px-3 py-2 border border-border min-w-0"
+                  value={sheetNameDraft}
+                  onChangeText={setSheetNameDraft}
+                  placeholder="Sheet name..."
+                  placeholderTextColor="#6b6b7b"
+                  autoFocus
+                  editable={!updateSheet.isPending}
+                  onSubmitEditing={applySheetName}
+                />
+                <TouchableOpacity
+                  onPress={applySheetName}
+                  disabled={updateSheet.isPending}
+                  className="px-2 py-2"
+                  accessibilityLabel="Save sheet name"
+                >
+                  <Text className="text-accent font-extrabold text-2xl">✓</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <Text
+                  className="text-text-primary text-2xl font-bold shrink min-w-0"
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  {sheet.name}
+                </Text>
+                <TouchableOpacity
+                  onPress={beginEditSheetName}
+                  className="shrink-0 px-2 py-2"
+                  accessibilityLabel="Edit sheet name"
+                >
+                  <Text className="text-text-secondary text-xl">✎</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
           {sheet.description && (
             <Text className="text-text-secondary mt-1">{sheet.description}</Text>
           )}

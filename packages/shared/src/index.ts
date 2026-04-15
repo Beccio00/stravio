@@ -19,6 +19,8 @@ export interface WorkoutSheet {
   userId: string;
   name: string;
   description: string | null;
+  /** Lower value = higher in the list (0 = first row). */
+  orderIndex: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -31,6 +33,7 @@ export interface CreateWorkoutSheetInput {
 export interface UpdateWorkoutSheetInput {
   name?: string;
   description?: string;
+  orderIndex?: number;
 }
 
 // --- Exercise ---

@@ -58,6 +58,14 @@ export function useDeleteSheet() {
   });
 }
 
+export function useReorderSheets() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (orderedIds: string[]) => api.sheets.reorder(orderedIds),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["sheets"] }),
+  });
+}
+
 // ==================== EXERCISES ====================
 
 export function useCreateExercise() {
@@ -157,6 +165,19 @@ export function useCompleteSession() {
       qc.invalidateQueries({ queryKey: ["sessions"] });
       qc.invalidateQueries({ queryKey: ["sessions", id] });
       qc.invalidateQueries({ queryKey: ["sessions", "completed"] });
+    },
+  });
+}
+
+export function useDeleteSession() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.sessions.delete(id),
+    onSuccess: (_, id) => {
+      qc.invalidateQueries({ queryKey: ["sessions"] });
+      qc.invalidateQueries({ queryKey: ["sessions", id] });
+      qc.invalidateQueries({ queryKey: ["sessions", "completed"] });
+      qc.removeQueries({ queryKey: ["sessions", id] });
     },
   });
 }

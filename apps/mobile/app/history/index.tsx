@@ -1,7 +1,7 @@
-import { View, Text, TouchableOpacity, FlatList } from "react-native";
+import { View, Text, TouchableOpacity, FlatList, Alert, Platform } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useCompletedSessions } from "../../src/api/hooks";
+import { useCompletedSessions, useDeleteSession } from "../../src/api/hooks";
 import { useState, useMemo } from "react";
 import type { WorkoutSessionWithSheet } from "@bhmt3wp/shared";
 
@@ -23,6 +23,22 @@ function getFirstDayOfWeek(year: number, month: number) {
 export default function HistoryScreen() {
   const router = useRouter();
   const { data: sessions, isLoading } = useCompletedSessions();
+  const deleteSession = useDeleteSession();
+
+  const confirmDeleteSession = (id: string, sheetName: string) => {
+    const title = "Delete workout";
+    const message = `Remove "${sheetName}" from your history? This cannot be undone.`;
+    const runDelete = () => deleteSession.mutate(id);
+
+    if (Platform.OS === "web") {
+      if (window.confirm(`${title}\n\n${message}`)) runDelete();
+    } else {
+      Alert.alert(title, message, [
+        { text: "Cancel", style: "cancel" },
+        { text: "Delete", style: "destructive", onPress: runDelete },
+      ]);
+    }
+  };
 
   const today = new Date();
   const [calYear, setCalYear] = useState(today.getFullYear());
@@ -152,6 +168,8 @@ export default function HistoryScreen() {
       <TouchableOpacity
         className="bg-surface rounded-2xl p-4 mb-3 border border-border"
         onPress={() => router.push(`/history/${item.id}`)}
+        onLongPress={() => confirmDeleteSession(item.id, item.sheetName)}
+        delayLongPress={400}
         activeOpacity={0.7}
       >
         <View className="flex-row items-center justify-between">
@@ -222,13 +240,21 @@ export default function HistoryScreen() {
           data={monthSessions}
           keyExtractor={(item) => item.id}
           renderItem={renderSession}
+          extraData={deleteSession.isPending}
           contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
           ListHeaderComponent={
-            <Text className="text-text-secondary text-sm mb-2">
-              {monthSessions.length > 0
-                ? `${monthSessions.length} workout${monthSessions.length === 1 ? "" : "s"} in ${MONTHS[calMonth]}`
-                : `No workouts in ${MONTHS[calMonth]}`}
-            </Text>
+            <View className="mb-2">
+              <Text className="text-text-secondary text-sm">
+                {monthSessions.length > 0
+                  ? `${monthSessions.length} workout${monthSessions.length === 1 ? "" : "s"} in ${MONTHS[calMonth]}`
+                  : `No workouts in ${MONTHS[calMonth]}`}
+              </Text>
+              {monthSessions.length > 0 ? (
+                <Text className="text-text-muted text-xs mt-1">
+                  Tap to open details · Long press to delete
+                </Text>
+              ) : null}
+            </View>
           }
         />
       )}

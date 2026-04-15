@@ -48,6 +48,7 @@ function mapSheet(row: any): WorkoutSheet {
     userId: row.user_id,
     name: row.name,
     description: row.description,
+    orderIndex: row.order_index ?? 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -118,6 +119,7 @@ export const api = {
       const { data, error } = await supabase
         .from("workout_sheets")
         .select("*")
+        .order("order_index", { ascending: true })
         .order("created_at", { ascending: false });
       if (error) throw new Error(error.message);
       return (data ?? []).map(mapSheet);
@@ -156,12 +158,23 @@ export const api = {
 
     create: async (data: CreateWorkoutSheetInput): Promise<WorkoutSheet> => {
       const userId = await getUserId();
+      const { data: minRows, error: minErr } = await supabase
+        .from("workout_sheets")
+        .select("order_index")
+        .eq("user_id", userId)
+        .order("order_index", { ascending: true })
+        .limit(1);
+      if (minErr) throw new Error(minErr.message);
+      const nextOrder =
+        !minRows?.length ? 0 : ((minRows[0] as { order_index: number }).order_index ?? 0) - 1;
+
       const { data: result, error } = await supabase
         .from("workout_sheets")
         .insert({
           user_id: userId,
           name: data.name,
           description: data.description ?? null,
+          order_index: nextOrder,
         })
         .select()
         .single();
@@ -173,6 +186,7 @@ export const api = {
       const updates: Record<string, any> = {};
       if (data.name !== undefined) updates.name = data.name;
       if (data.description !== undefined) updates.description = data.description;
+      if (data.orderIndex !== undefined) updates.order_index = data.orderIndex;
 
       const { data: result, error } = await supabase
         .from("workout_sheets")
@@ -187,6 +201,18 @@ export const api = {
     delete: async (id: string): Promise<void> => {
       const { error } = await supabase.from("workout_sheets").delete().eq("id", id);
       if (error) throw new Error(error.message);
+    },
+
+    /** Persists list order: first id = top (order_index 0). */
+    reorder: async (orderedIds: string[]): Promise<void> => {
+      if (orderedIds.length === 0) return;
+      const results = await Promise.all(
+        orderedIds.map((sheetId, orderIndex) =>
+          supabase.from("workout_sheets").update({ order_index: orderIndex }).eq("id", sheetId),
+        ),
+      );
+      const failed = results.find((r) => r.error);
+      if (failed?.error) throw new Error(failed.error.message);
     },
   },
 
