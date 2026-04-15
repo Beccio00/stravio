@@ -2,7 +2,7 @@
   "expo": {
     "name": "Stravio",
     "slug": "stravio",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "stravio",
@@ -44,6 +44,6 @@
         "projectId": "409a6cbe-3f04-4863-9dd3-7d614ec338ef"
       }
     },
-    "owner": "beccio00"
+    "owner": "stravio"
   }
 }
