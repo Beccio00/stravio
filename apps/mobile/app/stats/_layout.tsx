@@ -4,9 +4,7 @@ export default function StatsLayout() {
   return (
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: "#1a1a2e" },
-        headerTintColor: "#ffffff",
-        headerTitleStyle: { fontWeight: "bold" },
+        headerShown: false,
         contentStyle: { backgroundColor: "#0f0f1a" },
       }}
     />

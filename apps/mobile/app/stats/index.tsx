@@ -210,7 +210,11 @@ function MaxWeightChart({ sessions, width }: BarChartProps) {
 export default function StatsScreen() {
   const { sessions, isLoading } = useStatsData();
   const { width } = useWindowDimensions();
-  const chartWidth = Math.min(width - 40, 360);
+  const contentHorizontalPadding = 20;
+  const cardHorizontalPadding = 16;
+  const availableChartWidth =
+    width - contentHorizontalPadding * 2 - cardHorizontalPadding * 2;
+  const chartWidth = Math.min(Math.max(availableChartWidth, 0), 360);
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={["bottom"]}>

@@ -113,17 +113,17 @@ export default function HomeScreen() {
           activeOpacity={0.7}
           className={`bg-surface rounded-2xl p-5 mb-3 border border-border ${isActive ? "opacity-95" : ""}`}
         >
-          <View className="flex-row items-center gap-2">
+          <View className="flex-row items-center">
             {!isEditing && (
               <GHTouchableOpacity
                 onLongPress={drag}
                 delayLongPress={180}
                 disabled={reorderSheets.isPending}
-                className="py-2 pr-1"
+                className="h-8 w-6 mr-2 items-center justify-center"
                 accessibilityLabel="Hold and drag to reorder sheets"
                 accessibilityRole="button"
               >
-                <Text className="text-text-muted text-lg">☰</Text>
+                <Text className="text-text-muted text-lg leading-5">☰</Text>
               </GHTouchableOpacity>
             )}
             {isEditing ? (
@@ -150,15 +150,15 @@ export default function HomeScreen() {
             ) : (
               <>
                 <GHTouchableOpacity
-                  className="flex-1 shrink min-w-0"
+                  className="flex-1 shrink min-w-0 h-8 justify-center"
                   onLongPress={() => handleDelete(item.id, item.name)}
                   activeOpacity={1}
                 >
-                  <Text className="text-text-primary text-lg font-bold">{item.name}</Text>
+                  <Text className="text-text-primary text-lg font-bold leading-5">{item.name}</Text>
                 </GHTouchableOpacity>
                 <GHTouchableOpacity
                   onPress={() => beginRename(item)}
-                  className="px-2 py-2"
+                  className="h-8 px-2 justify-center"
                   accessibilityLabel="Edit sheet name"
                 >
                   <Text className="text-text-secondary text-lg">✎</Text>

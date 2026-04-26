@@ -496,16 +496,26 @@ function SetRow({
   }
 
   return (
-    <TouchableOpacity
-      className="flex-row items-center mb-2 px-1 py-1"
-      onPress={() => setIsEditing(true)}
-      onLongPress={onDelete}
-    >
-      <Text className="text-text-secondary text-sm w-10 font-semibold">{set.setNumber}</Text>
-      <Text className="text-text-primary text-sm flex-1 text-center">{set.weightKg}</Text>
-      <Text className="text-text-primary text-sm flex-1 text-center">{set.reps}</Text>
-      <Text className="text-text-muted text-sm flex-1 text-center">{set.restTimeSec}s</Text>
-      <View className="w-8" />
-    </TouchableOpacity>
+    <View className="flex-row items-center mb-2 px-1 py-1">
+      <TouchableOpacity
+        className="flex-1 flex-row items-center"
+        onPress={() => setIsEditing(true)}
+        accessibilityRole="button"
+        accessibilityLabel={`Edit set ${set.setNumber}`}
+      >
+        <Text className="text-text-secondary text-sm w-10 font-semibold">{set.setNumber}</Text>
+        <Text className="text-text-primary text-sm flex-1 text-center">{set.weightKg}</Text>
+        <Text className="text-text-primary text-sm flex-1 text-center">{set.reps}</Text>
+        <Text className="text-text-muted text-sm flex-1 text-center">{set.restTimeSec}s</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        className="w-8 items-center"
+        onPress={onDelete}
+        accessibilityRole="button"
+        accessibilityLabel={`Delete set ${set.setNumber}`}
+      >
+        <Text className="text-danger text-xs font-bold">X</Text>
+      </TouchableOpacity>
+    </View>
   );
 }
