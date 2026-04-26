@@ -187,12 +187,20 @@ export default function HomeScreen() {
               Tap a sheet to open · Long press the name to delete · Hold ☰ then drag to reorder
             </Text>
           </View>
-          <TouchableOpacity
-            className="bg-surface rounded-xl px-4 py-2 border border-border"
-            onPress={() => router.push("/history")}
-          >
-            <Text className="text-primary text-sm font-bold">📅 History</Text>
-          </TouchableOpacity>
+          <View className="flex-row gap-2">
+            <TouchableOpacity
+              className="bg-surface rounded-xl px-4 py-2 border border-border"
+              onPress={() => router.push("/history")}
+            >
+              <Text className="text-primary text-sm font-bold">📅 History</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              className="bg-surface rounded-xl px-4 py-2 border border-border"
+              onPress={() => router.push("/stats")}
+            >
+              <Text className="text-primary text-sm font-bold">📊 Stats</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
