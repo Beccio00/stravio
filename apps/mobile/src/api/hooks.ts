@@ -100,6 +100,14 @@ export function useDeleteExercise(sheetId: string) {
   });
 }
 
+export function useReorderExercises(sheetId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (orderedIds: string[]) => api.exercises.reorder(orderedIds),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["sheets", sheetId] }),
+  });
+}
+
 // ==================== SETS ====================
 
 export function useCreateSet(sheetId: string) {
