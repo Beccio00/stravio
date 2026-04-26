@@ -19,7 +19,6 @@
 
 - [ ] **i18n** – Italian and English language support.
 - [ ] **Data export** – Export workout history as CSV or PDF.
-- [ ] **Custom splash screen and icon** – Replace default Expo assets.
 
 ## Done
 
@@ -39,3 +38,4 @@
 - [x] Web build support (Expo web export)
 - [x] Vercel deployment config
 - [x] Project documentation (docs/)
+- [x] **Custom icon and favicon** – Replaced default Expo placeholder assets with project logo (1024×1024 app icon, 64×64 web favicon).
