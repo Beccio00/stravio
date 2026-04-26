@@ -105,7 +105,10 @@ export default function HomeScreen() {
     const isEditing = editingSheetId === item.id;
     return (
       <ScaleDecorator>
-        <View
+        <GHTouchableOpacity
+          onPress={() => router.push(`/sheet/${item.id}`)}
+          disabled={isEditing}
+          activeOpacity={0.7}
           className={`bg-surface rounded-2xl p-5 mb-3 border border-border ${isActive ? "opacity-95" : ""}`}
         >
           <View className="flex-row items-center gap-2">
@@ -146,9 +149,8 @@ export default function HomeScreen() {
               <>
                 <GHTouchableOpacity
                   className="flex-1 shrink min-w-0"
-                  onPress={() => router.push(`/sheet/${item.id}`)}
                   onLongPress={() => handleDelete(item.id, item.name)}
-                  activeOpacity={0.7}
+                  activeOpacity={1}
                 >
                   <Text className="text-text-primary text-lg font-bold">{item.name}</Text>
                 </GHTouchableOpacity>
@@ -162,7 +164,7 @@ export default function HomeScreen() {
               </>
             )}
           </View>
-        </View>
+        </GHTouchableOpacity>
       </ScaleDecorator>
     );
   };
