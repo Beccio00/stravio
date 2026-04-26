@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "../src/contexts/AuthContext";
+import { init as initNotifications } from "../src/lib/notifications";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -54,6 +55,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 // Root layout
 // ---------------------------------------------------------------------------
 export default function RootLayout() {
+  useEffect(() => { initNotifications().catch(() => {}); }, []);
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>

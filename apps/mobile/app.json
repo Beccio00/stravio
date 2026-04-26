@@ -2,7 +2,7 @@
   "expo": {
     "name": "Stravio",
     "slug": "stravio",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "stravio",
@@ -13,13 +13,17 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.bhmt3wp.stravio"
+      "bundleIdentifier": "com.bhmt3wp.stravio",
+      "infoPlist": {
+        "NSUserNotificationUsageDescription": "Daily workout reminders to help you stay consistent."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#1a1a2e"
       },
-      "package": "com.bhmt3wp.stravio"
+      "package": "com.bhmt3wp.stravio",
+      "permissions": ["android.permission.SCHEDULE_EXACT_ALARM", "android.permission.VIBRATE"]
     },
     "web": {
       "bundler": "metro",
@@ -27,6 +31,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-notifications",
       [
         "expo-build-properties",
         {
@@ -44,6 +49,6 @@
         "projectId": "409a6cbe-3f04-4863-9dd3-7d614ec338ef"
       }
     },
-    "owner": "beccio00"
+    "owner": "stravio"
   }
 }
