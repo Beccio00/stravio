@@ -174,7 +174,10 @@ export default function HomeScreen() {
   return (
     <SafeAreaView className="flex-1 bg-background">
       <View className="px-5 pt-4 pb-2">
-        <View className="flex-row justify-end mb-3">
+        <View className="flex-row justify-end items-center gap-3 mb-3">
+          <TouchableOpacity onPress={() => router.push("/settings")}>
+            <Text className="text-text-secondary text-lg">⚙️</Text>
+          </TouchableOpacity>
           <TouchableOpacity onPress={signOut}>
             <Text className="text-danger text-sm">Logout</Text>
           </TouchableOpacity>
