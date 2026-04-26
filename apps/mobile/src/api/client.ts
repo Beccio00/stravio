@@ -262,6 +262,17 @@ export const api = {
       const { error } = await supabase.from("exercises").delete().eq("id", id);
       if (error) throw new Error(error.message);
     },
+
+    reorder: async (orderedIds: string[]): Promise<void> => {
+      if (orderedIds.length === 0) return;
+      const results = await Promise.all(
+        orderedIds.map((exerciseId, orderIndex) =>
+          supabase.from("exercises").update({ order_index: orderIndex }).eq("id", exerciseId),
+        ),
+      );
+      const failed = results.find((r) => r.error);
+      if (failed?.error) throw new Error(failed.error.message);
+    },
   },
 
   sets: {

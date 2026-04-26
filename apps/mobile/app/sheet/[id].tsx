@@ -2,7 +2,6 @@ import {
   View,
   Text,
   TouchableOpacity,
-  ScrollView,
   TextInput,
   Alert,
   Platform,
@@ -19,9 +18,16 @@ import {
   useUpdateSet,
   useDeleteSet,
   useCreateSession,
+  useReorderExercises,
 } from "../../src/api/hooks";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ExerciseFull, ExerciseSet } from "@bhmt3wp/shared";
+import DraggableFlatList, { ScaleDecorator } from "react-native-draggable-flatlist";
+import type { RenderItemParams } from "react-native-draggable-flatlist";
+import { TouchableOpacity as GHTouchableOpacity } from "react-native-gesture-handler";
+import { cssInterop } from "nativewind";
+
+cssInterop(GHTouchableOpacity, { className: "style" });
 
 export default function SheetDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -36,11 +42,17 @@ export default function SheetDetailScreen() {
   const deleteSet = useDeleteSet(sheetId);
   const createSession = useCreateSession();
   const updateSheet = useUpdateSheet();
+  const reorderExercises = useReorderExercises(sheetId);
 
   const [newExerciseName, setNewExerciseName] = useState("");
   const [showAddExercise, setShowAddExercise] = useState(false);
   const [isEditingSheetName, setIsEditingSheetName] = useState(false);
   const [sheetNameDraft, setSheetNameDraft] = useState("");
+  const [exerciseList, setExerciseList] = useState<ExerciseFull[]>([]);
+
+  useEffect(() => {
+    if (sheet) setExerciseList(sheet.exercises);
+  }, [sheet]);
 
   const beginEditSheetName = () => {
     setSheetNameDraft(sheet?.name ?? "");
@@ -124,25 +136,24 @@ export default function SheetDetailScreen() {
     );
   };
 
-  if (isLoading) {
-    return (
-      <SafeAreaView className="flex-1 bg-background items-center justify-center">
-        <Text className="text-text-secondary text-lg">Loading...</Text>
-      </SafeAreaView>
-    );
-  }
+  const renderExercise = ({ item: exercise, drag, isActive }: RenderItemParams<ExerciseFull>) => (
+    <ScaleDecorator>
+      <ExerciseCard
+        exercise={exercise}
+        isActive={isActive}
+        drag={drag}
+        isPendingReorder={reorderExercises.isPending}
+        onDelete={() => handleDeleteExercise(exercise.id, exercise.name)}
+        onUpdateExercise={(data) => updateExercise.mutate({ id: exercise.id, ...data })}
+        onAddSet={() => handleAddSet(exercise.id, exercise.sets)}
+        onUpdateSet={(setId, data) => updateSet.mutate({ id: setId, ...data })}
+        onDeleteSet={(setId) => deleteSet.mutate(setId)}
+      />
+    </ScaleDecorator>
+  );
 
-  if (!sheet) {
-    return (
-      <SafeAreaView className="flex-1 bg-background items-center justify-center">
-        <Text className="text-danger text-lg">Sheet not found</Text>
-      </SafeAreaView>
-    );
-  }
-
-  return (
-    <SafeAreaView className="flex-1 bg-background">
-      {/* Header */}
+  const ListHeader = useMemo(
+    () => (
       <View className="px-5 pt-4 pb-3 flex-row items-center justify-between">
         <View className="flex-1">
           <TouchableOpacity onPress={() => router.back()}>
@@ -177,7 +188,7 @@ export default function SheetDetailScreen() {
                   numberOfLines={1}
                   ellipsizeMode="tail"
                 >
-                  {sheet.name}
+                  {sheet?.name}
                 </Text>
                 <TouchableOpacity
                   onPress={beginEditSheetName}
@@ -189,7 +200,7 @@ export default function SheetDetailScreen() {
               </>
             )}
           </View>
-          {sheet.description && (
+          {sheet?.description && (
             <Text className="text-text-secondary mt-1">{sheet.description}</Text>
           )}
         </View>
@@ -200,56 +211,79 @@ export default function SheetDetailScreen() {
           <Text className="text-background font-bold text-base">▶ Start</Text>
         </TouchableOpacity>
       </View>
+    ),
+    [isEditingSheetName, sheetNameDraft, sheet?.name, sheet?.description, updateSheet.isPending],
+  );
 
-      <ScrollView className="flex-1 px-5" contentContainerStyle={{ paddingBottom: 100 }}>
-        {sheet.exercises.map((exercise) => (
-          <ExerciseCard
-            key={exercise.id}
-            exercise={exercise}
-            onDelete={() => handleDeleteExercise(exercise.id, exercise.name)}
-            onUpdateExercise={(data) => updateExercise.mutate({ id: exercise.id, ...data })}
-            onAddSet={() => handleAddSet(exercise.id, exercise.sets)}
-            onUpdateSet={(setId, data) => updateSet.mutate({ id: setId, ...data })}
-            onDeleteSet={(setId) => deleteSet.mutate(setId)}
-          />
-        ))}
-
-        {/* Add exercise */}
-        {showAddExercise ? (
-          <View className="bg-surface rounded-2xl p-4 mb-3 border border-border">
-            <TextInput
-              className="bg-background text-text-primary rounded-xl px-4 py-3 text-base border border-border mb-3"
+  const ListFooter = useMemo(
+    () =>
+      showAddExercise ? (
+        <View className="bg-surface rounded-2xl p-4 mb-3 border border-border">
+          <TextInput
+            className="bg-background text-text-primary rounded-xl px-4 py-3 text-base border border-border mb-3"
             placeholder="Exercise name..."
-              placeholderTextColor="#6b6b7b"
-              value={newExerciseName}
-              onChangeText={setNewExerciseName}
-              autoFocus
-              onSubmitEditing={handleAddExercise}
-            />
-            <View className="flex-row gap-3">
-              <TouchableOpacity
-                className="flex-1 bg-background rounded-xl py-3 items-center"
-                onPress={() => setShowAddExercise(false)}
-              >
-                <Text className="text-text-secondary font-semibold">Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                className="flex-1 bg-primary rounded-xl py-3 items-center"
-                onPress={handleAddExercise}
-              >
-                <Text className="text-white font-semibold">Add</Text>
-              </TouchableOpacity>
-            </View>
+            placeholderTextColor="#6b6b7b"
+            value={newExerciseName}
+            onChangeText={setNewExerciseName}
+            autoFocus
+            onSubmitEditing={handleAddExercise}
+          />
+          <View className="flex-row gap-3">
+            <TouchableOpacity
+              className="flex-1 bg-background rounded-xl py-3 items-center"
+              onPress={() => setShowAddExercise(false)}
+            >
+              <Text className="text-text-secondary font-semibold">Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              className="flex-1 bg-primary rounded-xl py-3 items-center"
+              onPress={handleAddExercise}
+            >
+              <Text className="text-white font-semibold">Add</Text>
+            </TouchableOpacity>
           </View>
-        ) : (
-          <TouchableOpacity
-            className="bg-surface-light rounded-2xl p-4 mb-3 border border-border border-dashed items-center"
-            onPress={() => setShowAddExercise(true)}
-          >
-            <Text className="text-primary font-semibold text-base">+ Add Exercise</Text>
-          </TouchableOpacity>
-        )}
-      </ScrollView>
+        </View>
+      ) : (
+        <TouchableOpacity
+          className="bg-surface-light rounded-2xl p-4 mb-3 border border-border border-dashed items-center"
+          onPress={() => setShowAddExercise(true)}
+        >
+          <Text className="text-primary font-semibold text-base">+ Add Exercise</Text>
+        </TouchableOpacity>
+      ),
+    [showAddExercise, newExerciseName],
+  );
+
+  if (isLoading) {
+    return (
+      <SafeAreaView className="flex-1 bg-background items-center justify-center">
+        <Text className="text-text-secondary text-lg">Loading...</Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (!sheet) {
+    return (
+      <SafeAreaView className="flex-1 bg-background items-center justify-center">
+        <Text className="text-danger text-lg">Sheet not found</Text>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView className="flex-1 bg-background">
+      <DraggableFlatList
+        data={exerciseList}
+        keyExtractor={(item) => item.id}
+        renderItem={renderExercise}
+        onDragEnd={({ data, from, to }) => {
+          setExerciseList(data);
+          if (from !== to) reorderExercises.mutate(data.map((e) => e.id));
+        }}
+        ListHeaderComponent={ListHeader}
+        ListFooterComponent={ListFooter}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }}
+      />
     </SafeAreaView>
   );
 }
@@ -257,6 +291,9 @@ export default function SheetDetailScreen() {
 // ---- Exercise Card Component ----
 function ExerciseCard({
   exercise,
+  isActive,
+  drag,
+  isPendingReorder,
   onDelete,
   onUpdateExercise,
   onAddSet,
@@ -264,6 +301,9 @@ function ExerciseCard({
   onDeleteSet,
 }: {
   exercise: ExerciseFull;
+  isActive: boolean;
+  drag: () => void;
+  isPendingReorder: boolean;
   onDelete: () => void;
   onUpdateExercise: (data: { notes?: string }) => void;
   onAddSet: () => void;
@@ -282,8 +322,18 @@ function ExerciseCard({
   };
 
   return (
-    <View className="bg-surface rounded-2xl p-4 mb-3 border border-border">
+    <View className={`bg-surface rounded-2xl p-4 mb-3 border border-border ${isActive ? "opacity-90" : ""}`}>
       <View className="flex-row items-center justify-between mb-3">
+        <GHTouchableOpacity
+          onLongPress={drag}
+          delayLongPress={180}
+          disabled={isPendingReorder}
+          className="pr-2 py-1"
+          accessibilityLabel="Hold and drag to reorder exercise"
+          accessibilityRole="button"
+        >
+          <Text className="text-text-muted text-lg">☰</Text>
+        </GHTouchableOpacity>
         <Text className="text-text-primary text-lg font-bold flex-1">{exercise.name}</Text>
         <TouchableOpacity onPress={onDelete}>
           <Text className="text-danger text-sm">Delete</Text>
