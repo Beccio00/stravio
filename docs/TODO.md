@@ -1,25 +1,34 @@
 # TODO
 
-## High Priority
+## CURRENT
+
+- [ ] **Sheet card tap target** – Make the entire sheet card tappable, not only the sheet name.
+- [ ] **Set autofill from previous set** – When creating a new set, prefill weight, reps, and rest from the previous set in that exercise.
+- [ ] **Custom splash screen, icon, and favicon** – Replace default Expo assets and use `./logo.png` (512x512) as app icon plus `./favicon.ico` for web favicon.
+
+
+## BACKLOG
+
+### High Priority
 
 - [ ] **PowerSync integration** – Offline-first sync between local SQLite cache and Supabase Postgres. This will allow the mobile app to work offline and sync when back online.
-- [x] **Deploy web app to Vercel** – Run `vercel --prod` from root or connect GitHub repo to Vercel dashboard.
 - [ ] **Multi-user assignments (post-v1)** – Introduce owner/assignee relationships only with clear permission model.
 
-## Medium Priority
+### Medium Priority
 
 - [ ] **Workout statistics** – Charts showing progress over time (weight lifted, volume, frequency).
 - [ ] **Exercise library** – Pre-built exercise catalog with muscle group tags.
 - [ ] **Drag-to-reorder exercises** – Within a sheet, reorder exercises by dragging.
 - [ ] **Sheet templates** – Clone/duplicate an existing sheet.
 - [ ] **Push notifications** – Workout reminders (Expo Notifications).
-- [ ] **Profile settings screen** – Edit display name and change password.
+- [ ] **Settings screen** – Add a top-right settings button and allow display name/password updates, rest timer enable/disable, default rest time, and theme selection (light/dark; light theme implementation pending).
+- [ ] **UI/UX polish pass** – Apply small usability and visual improvements across core daily flows.
 
-## Low Priority
+### Low Priority
 
 - [ ] **i18n** – Italian and English language support.
 - [ ] **Data export** – Export workout history as CSV or PDF.
-- [ ] **Custom splash screen and icon** – Replace default Expo assets.
+
 
 ## Done
 
@@ -39,3 +48,5 @@
 - [x] Web build support (Expo web export)
 - [x] Vercel deployment config
 - [x] Project documentation (docs/)
+- [x] **Deploy web app to Vercel** – Run `vercel --prod` from root or connect GitHub repo to Vercel dashboard.
+
