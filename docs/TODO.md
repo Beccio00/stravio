@@ -39,3 +39,4 @@
 - [x] Web build support (Expo web export)
 - [x] Vercel deployment config
 - [x] Project documentation (docs/)
+- [x] **Set autofill from previous set** – When creating a new set, prefill weight, reps, and rest from the previous set in that exercise.
