@@ -1,4 +1,5 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, useQueries } from "@tanstack/react-query";
+import type { SessionDetailFull } from "@bhmt3wp/shared";
 import { api } from "./client";
 import type {
   CreateWorkoutSheetInput,
@@ -207,6 +208,23 @@ export function useCompletedSessions() {
     queryKey: ["sessions", "completed"],
     queryFn: () => api.sessions.completed(),
   });
+}
+
+export function useStatsData() {
+  const { data: completed = [] } = useCompletedSessions();
+  const last10 = completed.slice(0, 10);
+  const sessionQueries = useQueries({
+    queries: last10.map((s) => ({
+      queryKey: ["sessions", s.id],
+      queryFn: () => api.sessions.get(s.id),
+    })),
+  });
+  const sessions = sessionQueries
+    .map((q) => q.data)
+    .filter((s): s is SessionDetailFull => s != null)
+    .reverse();
+  const isLoading = sessionQueries.some((q) => q.isLoading);
+  return { sessions, isLoading };
 }
 
 export function useLastSessionBySheet(sheetId: string) {

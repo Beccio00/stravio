@@ -21,7 +21,9 @@ import { useAuth } from "../src/contexts/AuthContext";
 import DraggableFlatList, { ScaleDecorator } from "react-native-draggable-flatlist";
 import type { RenderItemParams } from "react-native-draggable-flatlist";
 import { TouchableOpacity as GHTouchableOpacity } from "react-native-gesture-handler";
+import { cssInterop } from "nativewind";
 
+cssInterop(GHTouchableOpacity, { className: "style" });
 export default function HomeScreen() {
   const router = useRouter();
   const { signOut } = useAuth();
@@ -105,7 +107,10 @@ export default function HomeScreen() {
     const isEditing = editingSheetId === item.id;
     return (
       <ScaleDecorator>
-        <View
+        <GHTouchableOpacity
+          onPress={() => router.push(`/sheet/${item.id}`)}
+          disabled={isEditing}
+          activeOpacity={0.7}
           className={`bg-surface rounded-2xl p-5 mb-3 border border-border ${isActive ? "opacity-95" : ""}`}
         >
           <View className="flex-row items-center gap-2">
@@ -146,9 +151,8 @@ export default function HomeScreen() {
               <>
                 <GHTouchableOpacity
                   className="flex-1 shrink min-w-0"
-                  onPress={() => router.push(`/sheet/${item.id}`)}
                   onLongPress={() => handleDelete(item.id, item.name)}
-                  activeOpacity={0.7}
+                  activeOpacity={1}
                 >
                   <Text className="text-text-primary text-lg font-bold">{item.name}</Text>
                 </GHTouchableOpacity>
@@ -162,7 +166,7 @@ export default function HomeScreen() {
               </>
             )}
           </View>
-        </View>
+        </GHTouchableOpacity>
       </ScaleDecorator>
     );
   };
@@ -183,12 +187,20 @@ export default function HomeScreen() {
               Tap a sheet to open · Long press the name to delete · Hold ☰ then drag to reorder
             </Text>
           </View>
-          <TouchableOpacity
-            className="bg-surface rounded-xl px-4 py-2 border border-border"
-            onPress={() => router.push("/history")}
-          >
-            <Text className="text-primary text-sm font-bold">📅 History</Text>
-          </TouchableOpacity>
+          <View className="flex-row gap-2">
+            <TouchableOpacity
+              className="bg-surface rounded-xl px-4 py-2 border border-border"
+              onPress={() => router.push("/history")}
+            >
+              <Text className="text-primary text-sm font-bold">📅 History</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              className="bg-surface rounded-xl px-4 py-2 border border-border"
+              onPress={() => router.push("/stats")}
+            >
+              <Text className="text-primary text-sm font-bold">📊 Stats</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
