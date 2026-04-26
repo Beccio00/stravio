@@ -39,3 +39,4 @@
 - [x] Vercel deployment config
 - [x] Project documentation (docs/)
 - [x] **Custom icon and favicon** – Replaced default Expo placeholder assets with project logo (1024×1024 app icon, 64×64 web favicon).
+- [x] **Set autofill from previous set** – When creating a new set, prefill weight, reps, and rest from the previous set in that exercise.
