@@ -21,7 +21,9 @@ import { useAuth } from "../src/contexts/AuthContext";
 import DraggableFlatList, { ScaleDecorator } from "react-native-draggable-flatlist";
 import type { RenderItemParams } from "react-native-draggable-flatlist";
 import { TouchableOpacity as GHTouchableOpacity } from "react-native-gesture-handler";
+import { cssInterop } from "nativewind";
 
+cssInterop(GHTouchableOpacity, { className: "style" });
 export default function HomeScreen() {
   const router = useRouter();
   const { signOut } = useAuth();
