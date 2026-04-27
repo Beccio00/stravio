@@ -1,10 +1,11 @@
+import { useEffect, useRef, useState } from "react";
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  TextInput,
   Alert,
   Platform,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -20,12 +21,30 @@ import {
   useCreateSession,
   useReorderExercises,
 } from "../../src/api/hooks";
-import { useEffect, useMemo, useRef, useState } from "react";
 import type { ExerciseFull, ExerciseSet } from "@bhmt3wp/shared";
 import DraggableFlatList, { ScaleDecorator } from "react-native-draggable-flatlist";
 import type { RenderItemParams } from "react-native-draggable-flatlist";
 import { TouchableOpacity as GHTouchableOpacity } from "react-native-gesture-handler";
 import { cssInterop } from "nativewind";
+import {
+  Check,
+  GripVertical,
+  NotebookPen,
+  PencilLine,
+  Play,
+  Plus,
+  Trash2,
+} from "lucide-react-native";
+import {
+  Button,
+  Card,
+  ICON_SIZE,
+  ICON_STROKE,
+  Input,
+  ScreenHeader,
+  StateBlock,
+  cx,
+} from "../../src/components/ui";
 
 cssInterop(GHTouchableOpacity, { className: "style" });
 
@@ -33,6 +52,7 @@ export default function SheetDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const sheetId = id!;
   const router = useRouter();
+
   const { data: sheet, isLoading } = useSheet(sheetId);
   const createExercise = useCreateExercise();
   const deleteExercise = useDeleteExercise(sheetId);
@@ -61,12 +81,14 @@ export default function SheetDetailScreen() {
 
   const applySheetName = () => {
     if (!sheet) return;
+
     const trimmed = sheetNameDraft.trim();
     if (!trimmed) return;
     if (trimmed === sheet.name) {
       setIsEditingSheetName(false);
       return;
     }
+
     updateSheet.mutate(
       { id: sheetId, name: trimmed },
       {
@@ -79,36 +101,40 @@ export default function SheetDetailScreen() {
             Alert.alert("Rename failed", msg);
           }
         },
-      }
+      },
     );
   };
 
   const handleAddExercise = () => {
     if (!newExerciseName.trim()) return;
+
     createExercise.mutate(
       {
         sheetId,
         name: newExerciseName.trim(),
-        orderIndex: (sheet?.exercises.length ?? 0),
+        orderIndex: sheet?.exercises.length ?? 0,
       },
       {
         onSuccess: () => {
           setNewExerciseName("");
           setShowAddExercise(false);
         },
-      }
+      },
     );
   };
 
-  const handleDeleteExercise = (exId: string, name: string) => {
+  const handleDeleteExercise = (exerciseId: string, name: string) => {
+    const title = "Delete exercise";
+    const message = `Delete \"${name}\" from this sheet?`;
+
     if (Platform.OS === "web") {
-      if (window.confirm(`Delete "${name}"?`)) {
-        deleteExercise.mutate(exId);
+      if (window.confirm(`${title}\n\n${message}`)) {
+        deleteExercise.mutate(exerciseId);
       }
     } else {
-      Alert.alert("Delete exercise", `Delete "${name}"?`, [
+      Alert.alert(title, message, [
         { text: "Cancel", style: "cancel" },
-        { text: "Delete", style: "destructive", onPress: () => deleteExercise.mutate(exId) },
+        { text: "Delete", style: "destructive", onPress: () => deleteExercise.mutate(exerciseId) },
       ]);
     }
   };
@@ -116,6 +142,7 @@ export default function SheetDetailScreen() {
   const handleAddSet = (exerciseId: string, currentSets: ExerciseSet[]) => {
     const nextSetNumber = currentSets.length + 1;
     const lastSet = currentSets[currentSets.length - 1];
+
     createSet.mutate({
       exerciseId,
       setNumber: nextSetNumber,
@@ -132,7 +159,7 @@ export default function SheetDetailScreen() {
         onSuccess: (session) => {
           router.push(`/workout/${session.id}?sheetId=${sheetId}`);
         },
-      }
+      },
     );
   };
 
@@ -152,143 +179,149 @@ export default function SheetDetailScreen() {
     </ScaleDecorator>
   );
 
-  const ListHeader = useMemo(
-    () => (
-      <View className="px-5 pt-4 pb-3 flex-row items-center justify-between">
-        <View className="flex-1">
-          <TouchableOpacity onPress={() => router.back()}>
-            <Text className="text-primary text-base mb-1">← Back</Text>
-          </TouchableOpacity>
-          <View className="flex-row items-center gap-2 mt-0.5">
-            {isEditingSheetName ? (
-              <>
-                <TextInput
-                  className="flex-1 bg-background text-text-primary text-2xl font-bold rounded-xl px-3 py-2 border border-border min-w-0"
-                  value={sheetNameDraft}
-                  onChangeText={setSheetNameDraft}
-                  placeholder="Sheet name..."
-                  placeholderTextColor="#6b6b7b"
-                  autoFocus
-                  editable={!updateSheet.isPending}
-                  onSubmitEditing={applySheetName}
-                />
-                <TouchableOpacity
-                  onPress={applySheetName}
-                  disabled={updateSheet.isPending}
-                  className="px-2 py-2"
-                  accessibilityLabel="Save sheet name"
-                >
-                  <Text className="text-accent font-extrabold text-2xl">✓</Text>
-                </TouchableOpacity>
-              </>
-            ) : (
-              <>
-                <Text
-                  className="text-text-primary text-2xl font-bold shrink min-w-0"
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
-                >
-                  {sheet?.name}
-                </Text>
-                <TouchableOpacity
-                  onPress={beginEditSheetName}
-                  className="shrink-0 px-2 py-2"
-                  accessibilityLabel="Edit sheet name"
-                >
-                  <Text className="text-text-secondary text-xl">✎</Text>
-                </TouchableOpacity>
-              </>
-            )}
-          </View>
-          {sheet?.description && (
-            <Text className="text-text-secondary mt-1">{sheet.description}</Text>
-          )}
-        </View>
-        <TouchableOpacity
-          className="bg-accent px-5 py-3 rounded-xl"
-          onPress={handleStartWorkout}
-        >
-          <Text className="text-background font-bold text-base">▶ Start</Text>
-        </TouchableOpacity>
-      </View>
-    ),
-    [isEditingSheetName, sheetNameDraft, sheet?.name, sheet?.description, updateSheet.isPending],
-  );
-
-  const ListFooter = useMemo(
-    () =>
-      showAddExercise ? (
-        <View className="bg-surface rounded-2xl p-4 mb-3 border border-border">
-          <TextInput
-            className="bg-background text-text-primary rounded-xl px-4 py-3 text-base border border-border mb-3"
-            placeholder="Exercise name..."
-            placeholderTextColor="#6b6b7b"
-            value={newExerciseName}
-            onChangeText={setNewExerciseName}
-            autoFocus
-            onSubmitEditing={handleAddExercise}
-          />
-          <View className="flex-row gap-3">
-            <TouchableOpacity
-              className="flex-1 bg-background rounded-xl py-3 items-center"
-              onPress={() => setShowAddExercise(false)}
-            >
-              <Text className="text-text-secondary font-semibold">Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              className="flex-1 bg-primary rounded-xl py-3 items-center"
-              onPress={handleAddExercise}
-            >
-              <Text className="text-white font-semibold">Add</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      ) : (
-        <TouchableOpacity
-          className="bg-surface-light rounded-2xl p-4 mb-3 border border-border border-dashed items-center"
-          onPress={() => setShowAddExercise(true)}
-        >
-          <Text className="text-primary font-semibold text-base">+ Add Exercise</Text>
-        </TouchableOpacity>
-      ),
-    [showAddExercise, newExerciseName],
-  );
-
   if (isLoading) {
     return (
-      <SafeAreaView className="flex-1 bg-background items-center justify-center">
-        <Text className="text-text-secondary text-lg">Loading...</Text>
+      <SafeAreaView className="flex-1 bg-background px-5 pt-8" edges={["bottom"]}>
+        <StateBlock title="Loading sheet" description="Preparing your exercises and sets." />
       </SafeAreaView>
     );
   }
 
   if (!sheet) {
     return (
-      <SafeAreaView className="flex-1 bg-background items-center justify-center">
-        <Text className="text-danger text-lg">Sheet not found</Text>
+      <SafeAreaView className="flex-1 bg-background px-5 pt-8" edges={["bottom"]}>
+        <StateBlock
+          title="Sheet not found"
+          description="This sheet might have been removed."
+          tone="danger"
+        />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-background">
+    <SafeAreaView className="flex-1 bg-background" edges={["bottom"]}>
       <DraggableFlatList
         data={exerciseList}
         keyExtractor={(item) => item.id}
         renderItem={renderExercise}
         onDragEnd={({ data, from, to }) => {
           setExerciseList(data);
-          if (from !== to) reorderExercises.mutate(data.map((e) => e.id));
+          if (from !== to) reorderExercises.mutate(data.map((exercise) => exercise.id));
         }}
-        ListHeaderComponent={ListHeader}
-        ListFooterComponent={ListFooter}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }}
+        ListHeaderComponent={
+          <View className="px-5 pt-3 pb-3">
+            <ScreenHeader
+              title={sheet.name}
+              subtitle="Plan your sets, then start the session when ready."
+              rightAction={
+                <Button
+                  label="Start"
+                  icon={Play}
+                  size="sm"
+                  onPress={handleStartWorkout}
+                  loading={createSession.isPending}
+                />
+              }
+            />
+
+            {isEditingSheetName ? (
+              <View className="mt-4 flex-row items-center">
+                <Input
+                  value={sheetNameDraft}
+                  onChangeText={setSheetNameDraft}
+                  placeholder="Sheet name"
+                  editable={!updateSheet.isPending}
+                  onSubmitEditing={applySheetName}
+                  containerClassName="flex-1"
+                  inputClassName="text-xl font-bold"
+                  returnKeyType="done"
+                  autoFocus
+                />
+                <TouchableOpacity
+                  onPress={applySheetName}
+                  disabled={updateSheet.isPending}
+                  className="ml-2 h-11 w-11 items-center justify-center rounded-xl bg-action-secondary border border-border"
+                  accessibilityLabel="Save sheet name"
+                >
+                  <Check size={ICON_SIZE} strokeWidth={ICON_STROKE} color="#22c55e" />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity
+                onPress={beginEditSheetName}
+                className="mt-4 flex-row items-center self-start rounded-xl border border-border bg-action-secondary px-3 py-2"
+                accessibilityRole="button"
+                accessibilityLabel="Rename sheet"
+              >
+                <PencilLine size={16} strokeWidth={ICON_STROKE} color="#c0c9d8" />
+                <Text className="ml-2 text-text-secondary text-sm font-semibold">Rename sheet</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        }
+        ListFooterComponent={
+          <View className="px-5 pb-4">
+            {showAddExercise ? (
+              <Card padding="lg" className="mb-3">
+                <Text className="text-text-primary text-lg font-bold">Add exercise</Text>
+                <Text className="text-text-secondary text-sm mt-1">
+                  Add one movement at a time, then fill your set template.
+                </Text>
+
+                <Input
+                  value={newExerciseName}
+                  onChangeText={setNewExerciseName}
+                  placeholder="Example: Incline dumbbell press"
+                  onSubmitEditing={handleAddExercise}
+                  containerClassName="mt-4"
+                  autoFocus
+                  returnKeyType="done"
+                />
+
+                <View className="mt-4 flex-row gap-3">
+                  <Button
+                    label="Cancel"
+                    variant="secondary"
+                    onPress={() => setShowAddExercise(false)}
+                    className="flex-1"
+                  />
+                  <Button
+                    label="Add"
+                    icon={Plus}
+                    onPress={handleAddExercise}
+                    className="flex-1"
+                    loading={createExercise.isPending}
+                  />
+                </View>
+              </Card>
+            ) : (
+              <Button
+                label="Add exercise"
+                icon={Plus}
+                variant="secondary"
+                onPress={() => setShowAddExercise(true)}
+                className="mb-3"
+              />
+            )}
+          </View>
+        }
+        ListEmptyComponent={
+          <View className="px-5 py-4">
+            <StateBlock
+              title="No exercises yet"
+              description="Add your first exercise to start building this sheet."
+              actionLabel="Add exercise"
+              onAction={() => setShowAddExercise(true)}
+            />
+          </View>
+        }
+        contentContainerStyle={{ paddingBottom: 120 }}
       />
     </SafeAreaView>
   );
 }
 
-// ---- Exercise Card Component ----
 function ExerciseCard({
   exercise,
   isActive,
@@ -322,83 +355,89 @@ function ExerciseCard({
   };
 
   return (
-    <View className={`bg-surface rounded-2xl p-4 mb-3 border border-border ${isActive ? "opacity-90" : ""}`}>
-      <View className="flex-row items-center justify-between mb-3">
-        <GHTouchableOpacity
-          onLongPress={drag}
-          delayLongPress={180}
-          disabled={isPendingReorder}
-          className="pr-2 py-1"
-          accessibilityLabel="Hold and drag to reorder exercise"
-          accessibilityRole="button"
-        >
-          <Text className="text-text-muted text-lg">☰</Text>
-        </GHTouchableOpacity>
-        <Text className="text-text-primary text-lg font-bold flex-1">{exercise.name}</Text>
-        <TouchableOpacity onPress={onDelete}>
-          <Text className="text-danger text-sm">Delete</Text>
-        </TouchableOpacity>
-      </View>
+    <View className="px-5">
+      <Card className={cx("mb-3", isActive && "opacity-90")} padding="md">
+        <View className="mb-3 flex-row items-center">
+          <GHTouchableOpacity
+            onLongPress={drag}
+            delayLongPress={180}
+            disabled={isPendingReorder}
+            className="mr-1 h-9 w-8 items-center justify-center"
+            accessibilityLabel="Hold and drag to reorder exercise"
+            accessibilityRole="button"
+          >
+            <GripVertical size={ICON_SIZE} strokeWidth={ICON_STROKE} color="#7c8aa5" />
+          </GHTouchableOpacity>
 
-      {/* Exercise Notes */}
-      {isEditingNotes ? (
-        <TextInput
-          className="bg-background border border-border rounded-lg px-3 py-2 text-text-primary text-sm mb-3"
-          placeholder="Add notes for this exercise..."
-          placeholderTextColor="#999"
-          value={notes}
-          onChangeText={setNotes}
-          onBlur={handleBlurNotes}
-          multiline
-          numberOfLines={3}
-          textAlignVertical="top"
-          autoFocus
-        />
-      ) : (
-        <TouchableOpacity
-          className="mb-3"
-          onPress={() => setIsEditingNotes(true)}
-        >
-          {exercise.notes ? (
-            <Text className="text-text-muted text-sm">{exercise.notes}</Text>
-          ) : (
-            <Text className="text-text-muted text-sm italic">Tap to add notes...</Text>
-          )}
-        </TouchableOpacity>
-      )}
+          <Text className="flex-1 text-text-primary text-lg font-bold">{exercise.name}</Text>
 
-      {/* Sets header */}
-      {exercise.sets.length > 0 && (
-        <View className="flex-row mb-2 px-1">
-          <Text className="text-text-muted text-xs w-10">SET</Text>
-          <Text className="text-text-muted text-xs flex-1 text-center">KG</Text>
-          <Text className="text-text-muted text-xs flex-1 text-center">REPS</Text>
-          <Text className="text-text-muted text-xs flex-1 text-center">REST</Text>
-          <View className="w-8" />
+          <TouchableOpacity
+            onPress={onDelete}
+            className="h-9 w-9 items-center justify-center rounded-xl bg-danger/15 border border-danger/30"
+            accessibilityRole="button"
+            accessibilityLabel={`Delete ${exercise.name}`}
+          >
+            <Trash2 size={16} strokeWidth={ICON_STROKE} color="#ef4444" />
+          </TouchableOpacity>
         </View>
-      )}
 
-      {/* Sets */}
-      {exercise.sets.map((set) => (
-        <SetRow
-          key={set.id}
-          set={set}
-          onUpdate={(data) => onUpdateSet(set.id, data)}
-          onDelete={() => onDeleteSet(set.id)}
+        {isEditingNotes ? (
+          <Input
+            value={notes}
+            onChangeText={setNotes}
+            onBlur={handleBlurNotes}
+            leftIcon={NotebookPen}
+            placeholder="Add cues, tempo, or setup reminders"
+            multiline
+            autoFocus
+            containerClassName="mb-3"
+          />
+        ) : (
+          <TouchableOpacity
+            className="mb-3 rounded-xl border border-border bg-surface-muted px-3 py-3"
+            onPress={() => setIsEditingNotes(true)}
+          >
+            <View className="flex-row items-start">
+              <NotebookPen size={16} strokeWidth={ICON_STROKE} color="#7c8aa5" />
+              <Text className="ml-2 flex-1 text-sm text-text-muted">
+                {exercise.notes || "Add exercise notes (tempo, setup, focus cues)."}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        )}
+
+        {exercise.sets.length > 0 ? (
+          <View className="mb-2 flex-row px-1">
+            <Text className="w-10 text-text-muted text-xs font-semibold">SET</Text>
+            <Text className="flex-1 text-center text-text-muted text-xs font-semibold">KG</Text>
+            <Text className="flex-1 text-center text-text-muted text-xs font-semibold">REPS</Text>
+            <Text className="flex-1 text-center text-text-muted text-xs font-semibold">REST</Text>
+            <View className="w-8" />
+          </View>
+        ) : null}
+
+        {exercise.sets.map((set) => (
+          <SetRow
+            key={set.id}
+            set={set}
+            onUpdate={(data) => onUpdateSet(set.id, data)}
+            onDelete={() => onDeleteSet(set.id)}
+          />
+        ))}
+
+        <Button
+          label="Add set"
+          icon={Plus}
+          variant="secondary"
+          size="sm"
+          onPress={onAddSet}
+          className="mt-2"
         />
-      ))}
-
-      <TouchableOpacity
-        className="bg-surface-light rounded-xl py-2 mt-2 items-center"
-        onPress={onAddSet}
-      >
-        <Text className="text-primary-light font-semibold text-sm">+ Add Set</Text>
-      </TouchableOpacity>
+      </Card>
     </View>
   );
 }
 
-// ---- Set Row Component ----
 function SetRow({
   set,
   onUpdate,
@@ -412,7 +451,6 @@ function SetRow({
   const [kg, setKg] = useState(set.weightKg.toString());
   const [reps, setReps] = useState(set.reps.toString());
   const [rest, setRest] = useState(set.restTimeSec.toString());
-
   const latestRef = useRef({ kg, reps, rest, isEditing });
 
   useEffect(() => {
@@ -429,14 +467,10 @@ function SetRow({
 
   const saveIfChanged = (values: { kg: string; reps: string; rest: string }) => {
     const nextWeight = parseFloat(values.kg) || 0;
-    const nextReps = parseInt(values.reps) || 0;
-    const nextRest = parseInt(values.rest) || 60;
+    const nextReps = parseInt(values.reps, 10) || 0;
+    const nextRest = parseInt(values.rest, 10) || 60;
 
-    if (
-      nextWeight === set.weightKg &&
-      nextReps === set.reps &&
-      nextRest === set.restTimeSec
-    ) {
+    if (nextWeight === set.weightKg && nextReps === set.reps && nextRest === set.restTimeSec) {
       return;
     }
 
@@ -456,65 +490,69 @@ function SetRow({
     return () => {
       const latest = latestRef.current;
       if (latest.isEditing) {
-        saveIfChanged({
-          kg: latest.kg,
-          reps: latest.reps,
-          rest: latest.rest,
-        });
+        saveIfChanged({ kg: latest.kg, reps: latest.reps, rest: latest.rest });
       }
     };
   }, [set.weightKg, set.reps, set.restTimeSec]);
 
   if (isEditing) {
     return (
-      <View className="flex-row items-center mb-2 px-1">
-        <Text className="text-text-secondary text-sm w-10">{set.setNumber}</Text>
+      <View className="mb-2 flex-row items-center rounded-xl bg-surface-muted px-2 py-2">
+        <Text className="w-10 text-text-secondary text-sm font-semibold">{set.setNumber}</Text>
+
         <TextInput
-          className="flex-1 bg-background text-text-primary rounded-lg px-2 py-1 text-center mx-1 border border-border"
+          className="mx-1 flex-1 rounded-lg border border-border bg-surface-light px-2 py-1 text-center text-text-primary text-sm"
           value={kg}
           onChangeText={setKg}
           keyboardType="numeric"
           autoFocus
         />
         <TextInput
-          className="flex-1 bg-background text-text-primary rounded-lg px-2 py-1 text-center mx-1 border border-border"
+          className="mx-1 flex-1 rounded-lg border border-border bg-surface-light px-2 py-1 text-center text-text-primary text-sm"
           value={reps}
           onChangeText={setReps}
           keyboardType="numeric"
         />
         <TextInput
-          className="flex-1 bg-background text-text-primary rounded-lg px-2 py-1 text-center mx-1 border border-border"
+          className="mx-1 flex-1 rounded-lg border border-border bg-surface-light px-2 py-1 text-center text-text-primary text-sm"
           value={rest}
           onChangeText={setRest}
           keyboardType="numeric"
         />
-        <TouchableOpacity onPress={handleSave} className="w-8 items-center">
-          <Text className="text-accent text-sm">✓</Text>
+
+        <TouchableOpacity onPress={handleSave} className="w-8 items-center" accessibilityLabel="Save set values">
+          <Check size={16} strokeWidth={ICON_STROKE} color="#22c55e" />
         </TouchableOpacity>
       </View>
     );
   }
 
   return (
-    <View className="flex-row items-center mb-2 px-1 py-1">
+    <View
+      className={cx(
+        "mb-2 flex-row items-center rounded-xl px-2 py-2",
+        set.setNumber % 2 === 0 ? "bg-surface-muted" : "bg-surface",
+      )}
+    >
       <TouchableOpacity
         className="flex-1 flex-row items-center"
         onPress={() => setIsEditing(true)}
         accessibilityRole="button"
         accessibilityLabel={`Edit set ${set.setNumber}`}
       >
-        <Text className="text-text-secondary text-sm w-10 font-semibold">{set.setNumber}</Text>
-        <Text className="text-text-primary text-sm flex-1 text-center">{set.weightKg}</Text>
-        <Text className="text-text-primary text-sm flex-1 text-center">{set.reps}</Text>
-        <Text className="text-text-muted text-sm flex-1 text-center">{set.restTimeSec}s</Text>
+        <Text className="w-10 text-text-secondary text-sm font-semibold">{set.setNumber}</Text>
+        <Text className="flex-1 text-center text-text-primary text-sm">{set.weightKg}</Text>
+        <Text className="flex-1 text-center text-text-primary text-sm">{set.reps}</Text>
+        <Text className="flex-1 text-center text-text-muted text-sm">{set.restTimeSec}s</Text>
       </TouchableOpacity>
+
       <TouchableOpacity
         className="w-8 items-center"
         onPress={onDelete}
         accessibilityRole="button"
         accessibilityLabel={`Delete set ${set.setNumber}`}
       >
-        <Text className="text-danger text-xs font-bold">X</Text>
+        <Trash2 size={14} strokeWidth={ICON_STROKE} color="#ef4444" />
       </TouchableOpacity>
     </View>
   );
