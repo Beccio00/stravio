@@ -1,4 +1,3 @@
-// Root babel.config.js — same as apps/mobile
 module.exports = function (api) {
   api.cache(true);
   return {
@@ -6,5 +5,6 @@ module.exports = function (api) {
       ["babel-preset-expo", { jsxImportSource: "nativewind" }],
       "nativewind/babel",
     ],
+    plugins: ["react-native-reanimated/plugin"],
   };
 };
