@@ -13,17 +13,13 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.bhmt3wp.stravio",
-      "infoPlist": {
-        "NSUserNotificationUsageDescription": "Daily workout reminders to help you stay consistent."
-      }
+      "bundleIdentifier": "com.bhmt3wp.stravio"
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#1a1a2e"
       },
-      "package": "com.bhmt3wp.stravio",
-      "permissions": ["android.permission.SCHEDULE_EXACT_ALARM", "android.permission.VIBRATE"]
+      "package": "com.bhmt3wp.stravio"
     },
     "web": {
       "bundler": "metro",
@@ -31,7 +27,6 @@
     },
     "plugins": [
       "expo-router",
-      "expo-notifications",
       [
         "expo-build-properties",
         {
