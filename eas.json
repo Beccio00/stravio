@@ -5,7 +5,10 @@
   },
   "build": {
     "base": {
-      "env": {}
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://dqtfhrdkikxfxnifnsqs.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_OZmvdHhLB7Z_m2r_fTbCPg_06Yzb9yu"
+      }
     },
     "development": {
       "extends": "base",

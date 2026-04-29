@@ -8,6 +8,7 @@ import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "../src/contexts/AuthContext";
 import { init as initNotifications } from "../src/lib/notifications";
+import { StateBlock } from "../src/components/ui";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -22,12 +23,12 @@ const queryClient = new QueryClient({
 // Auth gate – redirects to /auth/login or out of /auth based on session
 // ---------------------------------------------------------------------------
 function AuthGate({ children }: { children: React.ReactNode }) {
-  const { session, loading } = useAuth();
+  const { session, loading, configError } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
   useEffect(() => {
-    if (loading) return;
+    if (loading || configError) return;
 
     const inAuthGroup = segments[0] === "auth";
 
@@ -39,6 +40,18 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       router.replace("/");
     }
   }, [session, loading, segments]);
+
+  if (configError) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 24 }}>
+        <StateBlock
+          title="App configuration missing"
+          description={configError}
+          tone="danger"
+        />
+      </View>
+    );
+  }
 
   if (loading) {
     return (

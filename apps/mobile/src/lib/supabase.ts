@@ -34,13 +34,19 @@ const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY =
   process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
-if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
-  throw new Error(
-    "Missing Supabase env vars: set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY (or EXPO_PUBLIC_SUPABASE_ANON_KEY)",
-  );
+const FALLBACK_URL = "https://invalid.supabase.co";
+const FALLBACK_KEY = "invalid";
+
+export const supabaseConfigError =
+  !SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY
+    ? "Missing Supabase env vars: set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY (or EXPO_PUBLIC_SUPABASE_ANON_KEY)"
+    : null;
+
+if (supabaseConfigError) {
+  console.warn(supabaseConfigError);
 }
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+export const supabase = createClient(SUPABASE_URL ?? FALLBACK_URL, SUPABASE_PUBLISHABLE_KEY ?? FALLBACK_KEY, {
   auth: {
     storage,
     autoRefreshToken: true,
