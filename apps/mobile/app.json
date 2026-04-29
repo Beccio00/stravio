@@ -7,7 +7,7 @@
     "icon": "./assets/icon.png",
     "scheme": "stravio",
     "userInterfaceStyle": "dark",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "splash": {
       "backgroundColor": "#1a1a2e"
     },
