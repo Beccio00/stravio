@@ -10,8 +10,8 @@
     }
   },
   "include": [
-    "app/**/*.ts",
-    "app/**/*.tsx",
+    "apps/mobile/app/**/*.ts",
+    "apps/mobile/app/**/*.tsx",
     "apps/mobile/src/**/*.ts",
     "apps/mobile/src/**/*.tsx",
     "apps/mobile/nativewind-env.d.ts"

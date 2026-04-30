@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
-import { supabase } from "../lib/supabase";
+import { supabase, supabaseConfigError } from "../lib/supabase";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -19,6 +19,7 @@ interface AuthState {
   session: Session | null;
   user: User | null;
   profile: Profile | null;
+  configError: string | null;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (
     email: string,
@@ -53,12 +54,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // ------- Listen to auth state changes -------
   useEffect(() => {
-    // 1. Restore persisted session
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
-      setSession(s);
-      if (s?.user) fetchProfile(s.user.id);
+    if (supabaseConfigError) {
       setLoading(false);
-    });
+      setSession(null);
+      setProfile(null);
+      return;
+    }
+
+    // 1. Restore persisted session
+    supabase.auth
+      .getSession()
+      .then(({ data: { session: s } }) => {
+        setSession(s);
+        if (s?.user) fetchProfile(s.user.id);
+        setLoading(false);
+      })
+      .catch(() => {
+        setSession(null);
+        setProfile(null);
+        setLoading(false);
+      });
 
     // 2. Subscribe to future changes (login, logout, token refresh)
     const {
@@ -77,6 +92,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // ------- Auth helpers -------
   const signIn = async (email: string, password: string) => {
+    if (supabaseConfigError) {
+      return { error: supabaseConfigError };
+    }
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     return { error: error?.message ?? null };
   };
@@ -86,6 +104,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     password: string,
     displayName?: string,
   ) => {
+    if (supabaseConfigError) {
+      return { error: supabaseConfigError };
+    }
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -109,6 +130,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         session,
         user: session?.user ?? null,
         profile,
+        configError: supabaseConfigError,
         signIn,
         signUp,
         signOut,

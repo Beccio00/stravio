@@ -7,6 +7,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "../src/contexts/AuthContext";
+import { init as initNotifications } from "../src/lib/notifications";
+import { StateBlock } from "../src/components/ui";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -21,12 +23,12 @@ const queryClient = new QueryClient({
 // Auth gate – redirects to /auth/login or out of /auth based on session
 // ---------------------------------------------------------------------------
 function AuthGate({ children }: { children: React.ReactNode }) {
-  const { session, loading } = useAuth();
+  const { session, loading, configError } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
   useEffect(() => {
-    if (loading) return;
+    if (loading || configError) return;
 
     const inAuthGroup = segments[0] === "auth";
 
@@ -39,10 +41,22 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     }
   }, [session, loading, segments]);
 
+  if (configError) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 24 }}>
+        <StateBlock
+          title="App configuration missing"
+          description={configError}
+          tone="danger"
+        />
+      </View>
+    );
+  }
+
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#0f0f1a" }}>
-        <ActivityIndicator size="large" color="#6c63ff" />
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#0b1220" }}>
+        <ActivityIndicator size="large" color="#3b82f6" />
       </View>
     );
   }
@@ -54,6 +68,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 // Root layout
 // ---------------------------------------------------------------------------
 export default function RootLayout() {
+  useEffect(() => { initNotifications().catch(() => {}); }, []);
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>
@@ -63,14 +79,17 @@ export default function RootLayout() {
             <AuthGate>
               <Stack
                 screenOptions={{
-                  headerStyle: { backgroundColor: "#1a1a2e" },
-                  headerTintColor: "#ffffff",
-                  headerTitleStyle: { fontWeight: "bold" },
-                  contentStyle: { backgroundColor: "#0f0f1a" },
+                  headerStyle: { backgroundColor: "#121b2e" },
+                  headerTintColor: "#f8fafc",
+                  headerTitleStyle: { fontWeight: "700" },
+                  headerShadowVisible: false,
+                  contentStyle: { backgroundColor: "#0b1220" },
                 }}
               >
-                {/* Hide the header for the auth group */}
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
                 <Stack.Screen name="auth" options={{ headerShown: false }} />
+                <Stack.Screen name="sheet" options={{ headerShown: false }} />
+                <Stack.Screen name="workout" options={{ headerShown: false }} />
               </Stack>
             </AuthGate>
           </SafeAreaProvider>
