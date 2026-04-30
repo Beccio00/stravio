@@ -59,11 +59,18 @@ export default function SessionDetailScreen() {
         </Card>
 
         {session.exercises && session.exercises.length > 0 ? (
-          session.exercises.map((exercise) => (
+          session.exercises.map((exercise) => {
+            const noteEntry = session.exerciseNotes.find((n) => n.exerciseId === exercise.exerciseId);
+            return (
             <Card key={exercise.exerciseId} className="mb-3" padding="md">
-              <View className="mb-3 flex-row items-center">
-                <Dumbbell size={16} strokeWidth={ICON_STROKE} color="#60a5fa" />
-                <Text className="ml-2 text-text-primary text-lg font-bold">{exercise.exerciseName}</Text>
+              <View className="mb-3">
+                <View className="flex-row items-center">
+                  <Dumbbell size={16} strokeWidth={ICON_STROKE} color="#60a5fa" />
+                  <Text className="ml-2 text-text-primary text-lg font-bold">{exercise.exerciseName}</Text>
+                </View>
+                {noteEntry?.notes.trim() ? (
+                  <Text className="mt-1 text-text-muted italic text-sm">{noteEntry.notes}</Text>
+                ) : null}
               </View>
 
               <View className="mb-2 flex-row px-2">
@@ -86,7 +93,8 @@ export default function SessionDetailScreen() {
                 </View>
               ))}
             </Card>
-          ))
+            );
+          })
         ) : (
           <StateBlock title="No exercises recorded" description="There are no logged sets in this session." />
         )}
