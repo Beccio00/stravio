@@ -357,13 +357,20 @@ export const api = {
         .single();
       if (error) throw new Error(error.message);
 
-      const { data: logRows } = await supabase
-        .from("session_set_logs")
-        .select("*")
-        .eq("session_id", id)
-        .order("set_number");
+      const [{ data: logRows }, { data: noteRows }] = await Promise.all([
+        supabase
+          .from("session_set_logs")
+          .select("*")
+          .eq("session_id", id)
+          .order("set_number"),
+        supabase
+          .from("session_exercise_notes")
+          .select("*")
+          .eq("session_id", id),
+      ]);
 
       const logs = (logRows ?? []).map(mapLog);
+      const exerciseNotes = (noteRows ?? []).map(mapNote);
 
       // Group logs by exercise
       const exerciseIds = [...new Set(logs.map((l) => l.exerciseId))];
@@ -389,6 +396,7 @@ export const api = {
         sheetName: session.workout_sheets?.name ?? "Deleted sheet",
         logs,
         exercises,
+        exerciseNotes,
       };
     },
 
