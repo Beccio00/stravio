@@ -6,7 +6,6 @@ import {
   Check,
   ChevronRight,
   GripVertical,
-  LogOut,
   PencilLine,
   Plus,
   SquarePen,
@@ -16,7 +15,6 @@ import type { RenderItemParams } from "react-native-draggable-flatlist";
 import { TouchableOpacity as GHTouchableOpacity } from "react-native-gesture-handler";
 import { cssInterop } from "nativewind";
 import type { WorkoutSheet } from "@bhmt3wp/shared";
-import { useAuth } from "../../src/contexts/AuthContext";
 import {
   useCreateSheet,
   useDeleteSheet,
@@ -38,7 +36,6 @@ cssInterop(GHTouchableOpacity, { className: "style" });
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { signOut } = useAuth();
   const { data: sheets, isLoading, error } = useSheets();
   const createSheet = useCreateSheet();
   const deleteSheet = useDeleteSheet();
@@ -212,7 +209,6 @@ export default function HomeScreen() {
           title="My Sheets"
           subtitle="Create your plan, drag to reorder, long press a title to delete."
           icon={SquarePen}
-          rightAction={<Button label="Sign out" icon={LogOut} size="sm" variant="ghost" onPress={signOut} />}
         />
 
         <Button
