@@ -3,7 +3,9 @@ import { useEffect } from "react";
 import { View, ActivityIndicator } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Stack, useRouter, useSegments } from "expo-router";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient } from "@tanstack/react-query";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+import { persister } from "../src/lib/queryPersister";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "../src/contexts/AuthContext";
@@ -15,7 +17,8 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 2,
-      staleTime: 1000 * 30, // 30 seconds
+      staleTime: 1000 * 30,
+      gcTime: 1000 * 60 * 60 * 24,
     },
   },
 });
@@ -90,7 +93,10 @@ export default function RootLayout() {
       <PreferencesProvider>
         <PreferencesGate>
           <AuthProvider>
-            <QueryClientProvider client={queryClient}>
+            <PersistQueryClientProvider
+              client={queryClient}
+              persistOptions={{ persister, maxAge: 1000 * 60 * 60 * 24 }}
+            >
               <SafeAreaProvider>
                 <StatusBar style="light" />
                 <AuthGate>
@@ -110,7 +116,7 @@ export default function RootLayout() {
                   </Stack>
                 </AuthGate>
               </SafeAreaProvider>
-            </QueryClientProvider>
+            </PersistQueryClientProvider>
           </AuthProvider>
         </PreferencesGate>
       </PreferencesProvider>
