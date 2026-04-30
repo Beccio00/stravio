@@ -19,7 +19,13 @@
       "adaptiveIcon": {
         "backgroundColor": "#1a1a2e"
       },
-      "package": "com.bhmt3wp.stravio"
+      "package": "com.bhmt3wp.stravio",
+      "navigationBarColor": "#0f1728",
+      "navigationBarStyle": "dark"
+    },
+    "statusBar": {
+      "style": "light",
+      "backgroundColor": "#0b1220"
     },
     "web": {
       "bundler": "metro",
