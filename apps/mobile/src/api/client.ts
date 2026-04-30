@@ -109,6 +109,18 @@ function mapNote(row: any): SessionExerciseNote {
   };
 }
 
+/** order_index that puts a new sheet at the top of the user's list (current minimum − 1). */
+async function topOrderIndex(userId: string): Promise<number> {
+  const { data: minRows, error } = await supabase
+    .from("workout_sheets")
+    .select("order_index")
+    .eq("user_id", userId)
+    .order("order_index", { ascending: true })
+    .limit(1);
+  if (error) throw new Error(error.message);
+  return !minRows?.length ? 0 : ((minRows[0] as { order_index: number }).order_index ?? 0) - 1;
+}
+
 // ---------------------------------------------------------------------------
 // API implementation
 // ---------------------------------------------------------------------------
@@ -158,15 +170,7 @@ export const api = {
 
     create: async (data: CreateWorkoutSheetInput): Promise<WorkoutSheet> => {
       const userId = await getUserId();
-      const { data: minRows, error: minErr } = await supabase
-        .from("workout_sheets")
-        .select("order_index")
-        .eq("user_id", userId)
-        .order("order_index", { ascending: true })
-        .limit(1);
-      if (minErr) throw new Error(minErr.message);
-      const nextOrder =
-        !minRows?.length ? 0 : ((minRows[0] as { order_index: number }).order_index ?? 0) - 1;
+      const nextOrder = await topOrderIndex(userId);
 
       const { data: result, error } = await supabase
         .from("workout_sheets")
@@ -201,6 +205,54 @@ export const api = {
     delete: async (id: string): Promise<void> => {
       const { error } = await supabase.from("workout_sheets").delete().eq("id", id);
       if (error) throw new Error(error.message);
+    },
+
+    duplicate: async (sourceId: string): Promise<WorkoutSheet> => {
+      const userId = await getUserId();
+      const source = await api.sheets.get(sourceId);
+      const nextOrder = await topOrderIndex(userId);
+
+      const { data: newSheet, error: newSheetErr } = await supabase
+        .from("workout_sheets")
+        .insert({
+          user_id: userId,
+          name: `${source.name} (copy)`,
+          description: source.description ?? null,
+          order_index: nextOrder,
+        })
+        .select()
+        .single();
+      if (newSheetErr) throw new Error(newSheetErr.message);
+
+      await Promise.all(
+        source.exercises.map(async (ex) => {
+          const { data: newEx, error: exErr } = await supabase
+            .from("exercises")
+            .insert({
+              sheet_id: newSheet.id,
+              name: ex.name,
+              order_index: ex.orderIndex,
+              notes: ex.notes ?? null,
+            })
+            .select()
+            .single();
+          if (exErr) throw new Error(exErr.message);
+
+          if (ex.sets.length > 0) {
+            const setsToInsert = ex.sets.map((s) => ({
+              exercise_id: newEx.id,
+              set_number: s.setNumber,
+              reps: s.reps,
+              weight_kg: s.weightKg,
+              rest_time_sec: s.restTimeSec,
+            }));
+            const { error: setsErr } = await supabase.from("exercise_sets").insert(setsToInsert);
+            if (setsErr) throw new Error(setsErr.message);
+          }
+        }),
+      );
+
+      return mapSheet(newSheet);
     },
 
     /** Persists list order: first id = top (order_index 0). */
