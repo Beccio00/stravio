@@ -8,7 +8,6 @@
 - [ ] **Store current session in local cache** – This allows users to resume an active workout session even if they go on other tabs, close the app, or lose connectivity, improving the user experience during workouts.
 - [ ] **UI polish on sheet** - Inside the sheet, put the "Rename sheet" button on the right side of the sheet name, and just keep it as a pencil icon without text. This makes the UI cleaner and more intuitive, as users will associate the pencil icon with editing the sheet name.
 - [ ] **Fix notes** - The notes are not working properly, they are not saved and not shown in the sessions history. This needs to be fixed to ensure users can take notes on their exercises and review them later.
-- [ ] **Sheet templates** – Clone/duplicate an existing sheet.
 
 
 ## BACKLOG
@@ -56,3 +55,4 @@
 - [X] **Push notifications** – Workout reminders (Expo Notifications).
 - [X] **Drag-to-reorder exercises** – Within a sheet, reorder exercises by dragging.
 - [X] **Enhance settings** - Add options for rest timer, theme selection, and account management.
+- [X] **Sheet templates** – Long-press a sheet on the home screen to Rename / Duplicate / Delete. Duplicate clones the sheet with all exercises and sets via `api.sheets.duplicate(id)`.
