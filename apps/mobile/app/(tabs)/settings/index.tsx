@@ -12,8 +12,8 @@ import { BellRing, Globe, Timer, Palette, User, LogOut } from "lucide-react-nati
 import type { LucideIcon } from "lucide-react-native";
 import { Card, ICON_STROKE, ScreenHeader, StateBlock } from "../../../src/components/ui";
 import * as notifications from "../../../src/lib/notifications";
-import { prefs } from "../../../src/lib/preferences";
 import { useAuth } from "../../../src/contexts/AuthContext";
+import { usePreferences } from "../../../src/contexts/PreferencesContext";
 
 function IconCell({ icon: Icon }: { icon: LucideIcon }) {
   return (
@@ -25,29 +25,15 @@ function IconCell({ icon: Icon }: { icon: LucideIcon }) {
 
 export default function SettingsScreen() {
   const { user, signOut } = useAuth();
+  const { restEnabled, restDefaultSec, theme, setRestEnabled, setRestDefaultSec, setTheme, loading: prefsLoading } = usePreferences();
 
   const [notifEnabled, setNotifEnabled] = useState(true);
   const [notifLoading, setNotifLoading] = useState(true);
-
-  const [restEnabled, setRestEnabled] = useState(true);
-  const [restDefaultSec, setRestDefaultSec] = useState(60);
-  const [theme, setTheme] = useState("dark");
-  const [prefsLoading, setPrefsLoading] = useState(true);
 
   useEffect(() => {
     notifications.getEnabled().then((val) => {
       setNotifEnabled(val);
       setNotifLoading(false);
-    });
-    Promise.all([
-      prefs.restEnabled.get(),
-      prefs.restDefaultSec.get(),
-      prefs.theme.get(),
-    ]).then(([re, rd, th]) => {
-      setRestEnabled(re);
-      setRestDefaultSec(rd);
-      setTheme(th);
-      setPrefsLoading(false);
     });
   }, []);
 
@@ -117,10 +103,7 @@ export default function SettingsScreen() {
             </View>
             <Switch
               value={restEnabled}
-              onValueChange={async (v) => {
-                setRestEnabled(v);
-                await prefs.restEnabled.set(v);
-              }}
+              onValueChange={setRestEnabled}
               disabled={prefsLoading}
               trackColor={{ false: "#24324a", true: "#3b82f6" }}
               thumbColor={restEnabled ? "#f8fafc" : "#c0c9d8"}
@@ -133,10 +116,7 @@ export default function SettingsScreen() {
                 {[30, 45, 60, 90, 120].map((sec) => (
                   <TouchableOpacity
                     key={sec}
-                    onPress={async () => {
-                      setRestDefaultSec(sec);
-                      await prefs.restDefaultSec.set(sec);
-                    }}
+                    onPress={() => setRestDefaultSec(sec)}
                     className={`rounded-xl px-3 py-1.5 border ${
                       restDefaultSec === sec
                         ? "bg-action-primary border-action-primary"
@@ -167,10 +147,7 @@ export default function SettingsScreen() {
             {(["dark", "system"] as const).map((t) => (
               <TouchableOpacity
                 key={t}
-                onPress={async () => {
-                  setTheme(t);
-                  await prefs.theme.set(t);
-                }}
+                onPress={() => setTheme(t)}
                 className={`flex-1 rounded-xl px-3 py-2 items-center border ${
                   theme === t
                     ? "bg-action-primary border-action-primary"

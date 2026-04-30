@@ -1,12 +1,25 @@
-import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 
-const raw = (key: string, def: string) =>
-  Platform.OS === "web"
-    ? Promise.resolve(def)
-    : SecureStore.getItemAsync(key).then((v) => v ?? def);
-const write = (key: string, val: string) =>
-  Platform.OS !== "web" ? SecureStore.setItemAsync(key, val) : Promise.resolve();
+let storage: {
+  getItem: (key: string) => Promise<string | null>;
+  setItem: (key: string, value: string) => Promise<void>;
+};
+
+if (Platform.OS !== "web") {
+  const SecureStore = require("expo-secure-store") as typeof import("expo-secure-store");
+  storage = {
+    getItem: (key) => SecureStore.getItemAsync(key),
+    setItem: (key, value) => SecureStore.setItemAsync(key, value),
+  };
+} else {
+  storage = {
+    getItem: async (key) => globalThis.localStorage?.getItem(key) ?? null,
+    setItem: async (key, value) => globalThis.localStorage?.setItem(key, value),
+  };
+}
+
+const raw = (key: string, def: string) => storage.getItem(key).then((v) => v ?? def);
+const write = (key: string, val: string) => storage.setItem(key, val);
 
 export const prefs = {
   restEnabled: {
