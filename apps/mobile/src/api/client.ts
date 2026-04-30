@@ -203,6 +203,53 @@ export const api = {
       if (error) throw new Error(error.message);
     },
 
+    duplicate: async (sourceId: string): Promise<WorkoutSheet> => {
+      const userId = await getUserId();
+      const source = await api.sheets.get(sourceId);
+
+      const { data: newSheet, error: newSheetErr } = await supabase
+        .from("workout_sheets")
+        .insert({
+          user_id: userId,
+          name: `${source.name} (copy)`,
+          description: source.description ?? null,
+          order_index: source.orderIndex ?? 0,
+        })
+        .select()
+        .single();
+      if (newSheetErr) throw new Error(newSheetErr.message);
+
+      await Promise.all(
+        source.exercises.map(async (ex) => {
+          const { data: newEx, error: exErr } = await supabase
+            .from("exercises")
+            .insert({
+              sheet_id: newSheet.id,
+              name: ex.name,
+              order_index: ex.orderIndex,
+              notes: ex.notes ?? null,
+            })
+            .select()
+            .single();
+          if (exErr) throw new Error(exErr.message);
+
+          if (ex.sets.length > 0) {
+            const setsToInsert = ex.sets.map((s) => ({
+              exercise_id: newEx.id,
+              set_number: s.setNumber,
+              reps: s.reps,
+              weight_kg: s.weightKg,
+              rest_time_sec: s.restTimeSec,
+            }));
+            const { error: setsErr } = await supabase.from("exercise_sets").insert(setsToInsert);
+            if (setsErr) throw new Error(setsErr.message);
+          }
+        }),
+      );
+
+      return mapSheet(newSheet);
+    },
+
     /** Persists list order: first id = top (order_index 0). */
     reorder: async (orderedIds: string[]): Promise<void> => {
       if (orderedIds.length === 0) return;

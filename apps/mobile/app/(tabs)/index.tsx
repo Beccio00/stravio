@@ -6,6 +6,7 @@ import {
   Check,
   ChevronRight,
   GripVertical,
+  LogOut,
   PencilLine,
   Plus,
   SquarePen,
@@ -15,9 +16,11 @@ import type { RenderItemParams } from "react-native-draggable-flatlist";
 import { TouchableOpacity as GHTouchableOpacity } from "react-native-gesture-handler";
 import { cssInterop } from "nativewind";
 import type { WorkoutSheet } from "@bhmt3wp/shared";
+import { useAuth } from "../../src/contexts/AuthContext";
 import {
   useCreateSheet,
   useDeleteSheet,
+  useDuplicateSheet,
   useReorderSheets,
   useSheets,
   useUpdateSheet,
@@ -36,9 +39,11 @@ cssInterop(GHTouchableOpacity, { className: "style" });
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { signOut } = useAuth();
   const { data: sheets, isLoading, error } = useSheets();
   const createSheet = useCreateSheet();
   const deleteSheet = useDeleteSheet();
+  const duplicateSheet = useDuplicateSheet();
   const updateSheet = useUpdateSheet();
   const reorderSheets = useReorderSheets();
 
@@ -91,6 +96,34 @@ export default function HomeScreen() {
     setRenameDraft(item.name);
   };
 
+  const openSheetMenu = (item: WorkoutSheet) => {
+    if (Platform.OS === "web") {
+      const choice = window.prompt(
+        `"${item.name}"\n\nType an action: rename / duplicate / delete`,
+      );
+      if (!choice) return;
+      const action = choice.trim().toLowerCase();
+      if (action === "rename") {
+        beginRename(item);
+      } else if (action === "duplicate") {
+        duplicateSheet.mutate(item.id);
+      } else if (action === "delete") {
+        handleDelete(item.id, item.name);
+      }
+    } else {
+      Alert.alert(item.name, "Choose an action", [
+        { text: "Rename", onPress: () => beginRename(item) },
+        { text: "Duplicate", onPress: () => duplicateSheet.mutate(item.id) },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => handleDelete(item.id, item.name),
+        },
+        { text: "Cancel", style: "cancel" },
+      ]);
+    }
+  };
+
   const applyRename = () => {
     if (!editingSheetId) return;
     const trimmed = renameDraft.trim();
@@ -125,7 +158,7 @@ export default function HomeScreen() {
         <GHTouchableOpacity
           className="w-full"
           onPress={() => router.push(`/sheet/${item.id}`)}
-          onLongPress={() => handleDelete(item.id, item.name)}
+          onLongPress={() => openSheetMenu(item)}
           delayLongPress={350}
           disabled={isEditing}
           activeOpacity={0.75}
@@ -207,8 +240,9 @@ export default function HomeScreen() {
       <View className="px-5 pt-3 pb-2">
         <ScreenHeader
           title="My Sheets"
-          subtitle="Create your plan, drag to reorder, long press a title to delete."
+          subtitle="Create your plan, drag to reorder, long-press for options."
           icon={SquarePen}
+          rightAction={<Button label="Sign out" icon={LogOut} size="sm" variant="ghost" onPress={signOut} />}
         />
 
         <Button

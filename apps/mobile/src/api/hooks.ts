@@ -67,6 +67,14 @@ export function useReorderSheets() {
   });
 }
 
+export function useDuplicateSheet() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.sheets.duplicate(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["sheets"] }),
+  });
+}
+
 // ==================== EXERCISES ====================
 
 export function useCreateExercise() {
