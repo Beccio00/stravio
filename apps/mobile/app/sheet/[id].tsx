@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { PencilLine } from "lucide-react-native";
 import {
   useSheet,
   useUpdateSheet,
@@ -23,6 +24,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import type { ExerciseFull, ExerciseSet } from "@bhmt3wp/shared";
 import { prefs } from "../../src/lib/preferences";
+import { ICON_SIZE, ICON_STROKE } from "../../src/components/ui";
 
 export default function SheetDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -193,10 +195,10 @@ export default function SheetDetailScreen() {
                 </Text>
                 <TouchableOpacity
                   onPress={beginEditSheetName}
-                  className="shrink-0 px-2 py-2"
-                  accessibilityLabel="Edit sheet name"
+                  className="ml-2 h-9 w-9 items-center justify-center rounded-xl bg-action-secondary border border-border"
+                  accessibilityLabel="Rename sheet"
                 >
-                  <Text className="text-text-secondary text-xl">✎</Text>
+                  <PencilLine size={ICON_SIZE} strokeWidth={ICON_STROKE} color="#c0c9d8" />
                 </TouchableOpacity>
               </>
             )}
