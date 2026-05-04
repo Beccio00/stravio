@@ -13,6 +13,7 @@ import type {
   DeleteSessionSetLogInput,
   UpsertSessionExerciseNoteInput,
 } from "@bhmt3wp/shared";
+import type { ImportedSheet } from "../lib/sheetsIO";
 
 // ==================== SHEETS ====================
 
@@ -64,6 +65,14 @@ export function useReorderSheets() {
   return useMutation({
     mutationFn: (orderedIds: string[]) => api.sheets.reorder(orderedIds),
     onSettled: () => qc.invalidateQueries({ queryKey: ["sheets"] }),
+  });
+}
+
+export function useImportSheets() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (sheets: ImportedSheet[]) => api.sheets.import(sheets),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["sheets"] }),
   });
 }
 

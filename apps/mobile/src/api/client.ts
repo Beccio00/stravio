@@ -29,6 +29,7 @@ import type {
   UpsertSessionExerciseNoteInput,
   ExerciseFull,
 } from "@bhmt3wp/shared";
+import type { ImportedSheet } from "../lib/sheetsIO";
 
 // ---------------------------------------------------------------------------
 // Helpers – Supabase returns snake_case, our types use camelCase
@@ -201,6 +202,64 @@ export const api = {
     delete: async (id: string): Promise<void> => {
       const { error } = await supabase.from("workout_sheets").delete().eq("id", id);
       if (error) throw new Error(error.message);
+    },
+
+    /** Imports an array of sheets (with exercises + sets) as new sheets for the current user. */
+    import: async (sheets: ImportedSheet[]): Promise<void> => {
+      const userId = await getUserId();
+
+      // Find a safe starting order_index (below existing minimum)
+      const { data: existing } = await supabase
+        .from("workout_sheets")
+        .select("order_index")
+        .eq("user_id", userId)
+        .order("order_index", { ascending: true })
+        .limit(1);
+      const baseOrder = existing?.length ? (existing[0] as { order_index: number }).order_index - sheets.length : 0;
+
+      for (let si = 0; si < sheets.length; si++) {
+        const s = sheets[si];
+
+        const { data: sheetRow, error: sheetErr } = await supabase
+          .from("workout_sheets")
+          .insert({
+            user_id: userId,
+            name: s.name,
+            description: s.description ?? null,
+            order_index: baseOrder + si,
+          })
+          .select()
+          .single();
+        if (sheetErr) throw new Error(sheetErr.message);
+
+        for (let ei = 0; ei < s.exercises.length; ei++) {
+          const e = s.exercises[ei];
+          const { data: exRow, error: exErr } = await supabase
+            .from("exercises")
+            .insert({
+              sheet_id: sheetRow.id,
+              name: e.name,
+              notes: e.notes ?? null,
+              order_index: ei,
+            })
+            .select()
+            .single();
+          if (exErr) throw new Error(exErr.message);
+
+          if (e.sets.length > 0) {
+            const { error: setsErr } = await supabase.from("exercise_sets").insert(
+              e.sets.map((set) => ({
+                exercise_id: exRow.id,
+                set_number: set.setNumber,
+                reps: set.reps,
+                weight_kg: set.weightKg,
+                rest_time_sec: set.restTimeSec,
+              })),
+            );
+            if (setsErr) throw new Error(setsErr.message);
+          }
+        }
+      }
     },
 
     /** Persists list order: first id = top (order_index 0). */
