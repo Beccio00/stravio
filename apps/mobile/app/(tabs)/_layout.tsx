@@ -3,6 +3,7 @@ import { Tabs, useRouter, useSegments } from "expo-router";
 import { BarChart3, History as HistoryIcon, House, Settings2 } from "lucide-react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { ICON_SIZE, ICON_STROKE } from "../../src/components/ui";
+import { usePreferences } from "../../src/contexts/PreferencesContext";
 
 const TABS = [
   "/(tabs)/",
@@ -20,6 +21,9 @@ function getTabIdx(segments: string[]): number {
 }
 
 export default function TabsLayout() {
+  const { resolvedTheme } = usePreferences();
+  const isLight = resolvedTheme === "light";
+
   const router = useRouter();
   const segments = useSegments();
   const tabIdxRef = useRef(0);
@@ -52,10 +56,10 @@ export default function TabsLayout() {
         screenOptions={{
           headerShown: false,
           tabBarActiveTintColor: "#3b82f6",
-          tabBarInactiveTintColor: "#7c8aa5",
+          tabBarInactiveTintColor: isLight ? "#64748b" : "#7c8aa5",
           tabBarStyle: {
-            backgroundColor: "#0f1728",
-            borderTopColor: "#24324a",
+            backgroundColor: isLight ? "#ffffff" : "#0f1728",
+            borderTopColor: isLight ? "#cbd5e1" : "#24324a",
             borderTopWidth: 1,
             height: 68,
             paddingTop: 8,

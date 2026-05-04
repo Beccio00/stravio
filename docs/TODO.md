@@ -2,7 +2,7 @@
 
 ## CURRENT
 
-- [ ] **Light Theme** – Implement a light theme option in addition to the existing dark theme, and allow users to toggle between them in settings.
+- [ ] **PowerSync integration** – Offline-first sync between local cache and Supabase Postgres. This has to allow the mobile app to work offline and sync when back online, and should be much more quick by loading data from the local cache. Use SQLite if it works well with both Expo, Vercel and Android, otherwise consider alternatives
 - [ ] **Fix Notifications on Android** – Debug and resolve issues with Expo Notifications not working on Android devices, ensuring users receive workout reminders as intended and the doesn't glitch showing the white screen (compatibility problem).
 - [ ] **Store current session in local cache** – This allows users to resume an active workout session even if they go on other tabs, close the app, or lose connectivity, improving the user experience during workouts.
 - [ ] **UI polish on sheet** - Inside the sheet, put the "Rename sheet" button on the right side of the sheet name, and just keep it as a pencil icon without text. This makes the UI cleaner and more intuitive, as users will associate the pencil icon with editing the sheet name.
@@ -55,4 +55,5 @@
 - [X] **Push notifications** – Workout reminders (Expo Notifications).
 - [X] **Drag-to-reorder exercises** – Within a sheet, reorder exercises by dragging.
 - [X] **Enhance settings** - Add options for rest timer, theme selection, and account management.
+- [X] **Light Theme** – Real light theme alongside dark and system. CSS variables drive Tailwind tokens; PreferencesContext exposes a resolved theme; settings screen offers Dark / Light / System.
 - [X] **Local query cache** – Persist react-query cache to AsyncStorage so the app loads instantly from cache on cold start and refetches in the background. (Lighter alternative to PowerSync; full offline-first sync remains future work.)
