@@ -56,3 +56,4 @@
 - [X] **Drag-to-reorder exercises** – Within a sheet, reorder exercises by dragging.
 - [X] **Enhance settings** - Add options for rest timer, theme selection, and account management.
 - [X] **Light Theme** – Real light theme alongside dark and system. CSS variables drive Tailwind tokens; PreferencesContext exposes a resolved theme; settings screen offers Dark / Light / System.
+- [X] **Local query cache** – Persist react-query cache to AsyncStorage so the app loads instantly from cache on cold start and refetches in the background. (Lighter alternative to PowerSync; full offline-first sync remains future work.)

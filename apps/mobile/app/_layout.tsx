@@ -3,7 +3,9 @@ import { useEffect } from "react";
 import { View, ActivityIndicator } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Stack, useRouter, useSegments } from "expo-router";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient } from "@tanstack/react-query";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+import { persister } from "../src/lib/queryPersister";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { vars } from "nativewind";
@@ -16,7 +18,8 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 2,
-      staleTime: 1000 * 30, // 30 seconds
+      staleTime: 1000 * 30,
+      gcTime: 1000 * 60 * 60 * 24,
     },
   },
 });
@@ -125,6 +128,23 @@ function ThemedStack() {
 }
 
 // ---------------------------------------------------------------------------
+// Preferences gate — shows loading spinner until preferences are loaded
+// ---------------------------------------------------------------------------
+function PreferencesGate({ children }: { children: React.ReactNode }) {
+  const { loading } = usePreferences();
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#0b1220" }}>
+        <ActivityIndicator size="large" color="#3b82f6" />
+      </View>
+    );
+  }
+
+  return <>{children}</>;
+}
+
+// ---------------------------------------------------------------------------
 // Root layout
 // ---------------------------------------------------------------------------
 export default function RootLayout() {
@@ -132,15 +152,20 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <AuthProvider>
-        <PreferencesProvider>
-          <QueryClientProvider client={queryClient}>
-            <SafeAreaProvider>
-              <ThemeRoot />
-            </SafeAreaProvider>
-          </QueryClientProvider>
-        </PreferencesProvider>
-      </AuthProvider>
+      <PreferencesProvider>
+        <PreferencesGate>
+          <AuthProvider>
+            <PersistQueryClientProvider
+              client={queryClient}
+              persistOptions={{ persister, maxAge: 1000 * 60 * 60 * 24 }}
+            >
+              <SafeAreaProvider>
+                <ThemeRoot />
+              </SafeAreaProvider>
+            </PersistQueryClientProvider>
+          </AuthProvider>
+        </PreferencesGate>
+      </PreferencesProvider>
     </GestureHandlerRootView>
   );
 }
