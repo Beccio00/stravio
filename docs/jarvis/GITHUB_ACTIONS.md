@@ -55,7 +55,7 @@ Bez tego moduł `cialo` zwróci błąd API (403 / API not enabled).
 1. Repo na GitHubie (zalecane **private**).
 2. Wklej sekrety w Settings → Secrets → Actions.
 3. **Actions → Jarvis Import → Run workflow** — test ręczny z `days: 7`.
-4. Harmonogram: **co godzinę** (`cron: 0 * * * *` w workflow). Runy z harmonogramu importują **dzisiejszy dzień** (`DEFAULT_DAYS: 1`).
+4. Harmonogram: **co godzinę** (`cron: 0 * * * *` w workflow). Runy z harmonogramu importują **ostatnie 3 dni** (`DEFAULT_DAYS: 3`) — bufor, żeby wczorajszy `Dzien` dostał poranny zrzut z Connect po domknięciu doby.
 
 ### Pełny import od początku
 
@@ -76,7 +76,7 @@ Edytuj `.github/workflows/jarvis-import.yml`:
 | Raz dziennie o 06:00 UTC | `0 6 * * *` |
 | Raz w tygodniu (niedziela 08:00 UTC) | `0 8 * * 0` |
 
-Przy częstym harmonogramie trzymaj `DEFAULT_DAYS` nisko (1–2), żeby nie obciążać Garmin API. Ręczny run nadal może użyć `days: 7` lub więcej.
+Przy częstym harmonogramie trzymaj `DEFAULT_DAYS` nisko (**3** = bufor wczoraj+przedwczoraj). `1` zostawia wczorajszy `Dzien` przy wieczornym zrzucie. Ręczny run nadal może użyć `days: 7` lub więcej.
 
 **Uwagi:**
 

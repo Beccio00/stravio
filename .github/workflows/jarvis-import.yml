@@ -44,7 +44,7 @@ jobs:
       OPENSCALE_DRIVE_FOLDER_ID: ${{ secrets.OPENSCALE_DRIVE_FOLDER_ID }}
       GOOGLE_CREDENTIALS_FILE: google-service-account.json
       GARMIN_TOKEN_DIR: .garminconnect
-      DEFAULT_DAYS: "1"
+      DEFAULT_DAYS: "3"
       IMPORT_START_DATE: "2026-07-09"
       TIMEZONE: "Europe/Warsaw"
       REQUEST_DELAY_SEC: "0.4"

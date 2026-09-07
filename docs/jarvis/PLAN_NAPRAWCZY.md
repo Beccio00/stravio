@@ -18,7 +18,7 @@
 | `blocked` | Czeka na decyzję użytkownika (patrz sekcja H) |
 | `wontfix` | Świadomie pominięte |
 
-**Postęp:** 1 / 28 zadań ukończonych (ostatnia aktualizacja: 2026-08-11)
+**Postęp:** 2 / 28 zadań ukończonych (ostatnia aktualizacja: 2026-09-07)
 
 ---
 
@@ -47,7 +47,7 @@ Bez nowych funkcji w aplikacji. Najwyższy ROI dla Gema.
 | **0.3** | `todo` | PR po **Est. 1RM (Brzycki)**, nie max ciężar; klucz PR po **nazwie ćwiczenia**, nie `exercise_id` | `importers/workout.py:92-111` | Seria 95×8 dostaje PR po serii 100×1 jeśli Est. 1RM wyższe | **Wysoki** |
 | **0.4** | `todo` | Wiersz błędu w `daily.py` — upewnić się, że ma **21 pól** (Uwagi w kolumnie U) | `importers/daily.py:75-78` | Przy symulowanym błędzie Garmin komunikat w kolumnie U | Średni |
 | **0.5** | `todo` | Aktualizacja `GEM_INSTRUKCJA.md` według sekcji E audytu + **wklejenie do Gema** | `docs/jarvis/GEM_INSTRUKCJA.md`, Gem UI | Gem nie alarmuje o „kontuzji” z notatek technicznych; zna PR/typy Sen | **Wysoki** |
-| **0.6** | `todo` | `DEFAULT_DAYS: "3"` w workflow (bufor samonaprawy) | `.github/workflows/jarvis-import.yml:46` | Po 2-dniowej przerwie CI uzupełnia luki | Średni |
+| **0.6** | `done` | `DEFAULT_DAYS: "3"` w workflow (bufor samonaprawy) | `.github/workflows/jarvis-import.yml` | Cron godzinowy odświeża dziś+wczoraj+przedwczoraj (2026-09-07) | Średni |
 
 ### Szczegóły implementacji 0.1
 
@@ -145,7 +145,7 @@ rows_to_upsert.append([
 | D-10 | P2 | Limit 1000 aktywności Garmin | → **1.6** |
 | D-11 | P2 | Brak filtra `end_date` w aktywnościach | → **1.5** |
 | D-12 | P2 | `date.today()` UTC na CI | → **1.5** |
-| D-13 | P2 | `DEFAULT_DAYS=1` | → **0.6** |
+| D-13 | P2 | `DEFAULT_DAYS=1` zostawiało wczorajszy Dzien przy wieczornym zrzucie | **done** 2026-09-07 → **0.6** (`DEFAULT_DAYS: 3`) |
 | D-14 | P2 | Brzycki bez limitu powtórzeń | → **1.4** |
 | D-15 | P2 | App nie odtwarza stanu serii | → **3.4** |
 | D-16 | P2 | Tempo `"5:30"` → godzina w Sheets | → **1.4** |
