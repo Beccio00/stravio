@@ -89,12 +89,75 @@ def describe_zip_members(backup_path: Path) -> str:
     return ", ".join(parts) if parts else "(puste)"
 
 
+# Historyczne enumy MeasurementTypeKey (openScale ≤15, kolumna `key`) oraz
+# tożsamości schema 16+ (`identity` = 'builtin.' + lower(enum)), np. WEIGHT → builtin.weight.
+METRIC_TYPES: tuple[tuple[str, str, str], ...] = (
+    ("weight", "WEIGHT", "floatValue"),
+    ("bmi", "BMI", "floatValue"),
+    ("body_fat", "BODY_FAT", "floatValue"),
+    ("muscle", "MUSCLE", "floatValue"),
+    ("lbm", "LBM", "floatValue"),
+    ("bone", "BONE", "floatValue"),
+    ("water", "WATER", "floatValue"),
+    ("visceral_fat", "VISCERAL_FAT", "floatValue"),
+    ("bmr", "BMR", "floatValue"),
+    ("protein", "PROTEIN", "floatValue"),
+    ("impedance", "IMPEDANCE", "floatValue"),
+    ("comment", "COMMENT", "textValue"),
+)
+
+
 def _table_count(con: sqlite3.Connection, table: str) -> int | None:
     try:
         row = con.execute(f'SELECT COUNT(*) FROM "{table}"').fetchone()
     except sqlite3.Error:
         return None
     return int(row[0]) if row else 0
+
+
+def _table_columns(con: sqlite3.Connection, table: str) -> set[str]:
+    return {row[1] for row in con.execute(f'PRAGMA table_info("{table}")')}
+
+
+def measurement_type_predicate(type_columns: set[str], legacy_key: str) -> str:
+    """Warunek SQL dopasowujący typ pomiaru w schema `key` albo `identity`."""
+    if "identity" in type_columns:
+        identity = f"builtin.{legacy_key.lower()}"
+        return f"mt.identity = '{identity}'"
+    if "key" in type_columns:
+        return f"mt.key = '{legacy_key}'"
+    raise RuntimeError(
+        "Tabela MeasurementType nie ma kolumny identity ani key "
+        f"(kolumny: {sorted(type_columns)})"
+    )
+
+
+def describe_measurement_type_schema(type_columns: set[str]) -> str:
+    if "identity" in type_columns:
+        return "identity (openScale ≥16, builtin.weight)"
+    if "key" in type_columns:
+        return "key (openScale ≤15, WEIGHT)"
+    return f"nieznany ({', '.join(sorted(type_columns)) or 'brak kolumn'})"
+
+
+def build_measurements_query(type_columns: set[str]) -> str:
+    metric_selects = ",\n            ".join(
+        f"MAX(CASE WHEN {measurement_type_predicate(type_columns, legacy_key)} "
+        f"THEN mv.{value_column} END) AS {alias}"
+        for alias, legacy_key, value_column in METRIC_TYPES
+    )
+    return f"""
+        SELECT
+            m.id,
+            m.timestamp,
+            {metric_selects}
+        FROM Measurement m
+        LEFT JOIN MeasurementValue mv ON mv.measurementId = m.id
+        LEFT JOIN MeasurementType mt ON mt.id = mv.typeId
+        GROUP BY m.id, m.timestamp
+        HAVING weight IS NOT NULL
+        ORDER BY m.timestamp
+    """
 
 
 def checkpoint_extracted_wal(db_path: Path) -> None:
@@ -197,30 +260,6 @@ def build_row(
 
 
 def read_measurements_from_db(db_path: Path, tz) -> list[list]:
-    query = """
-        SELECT
-            m.id,
-            m.timestamp,
-            MAX(CASE WHEN mt.key = 'WEIGHT' THEN mv.floatValue END) AS weight,
-            MAX(CASE WHEN mt.key = 'BMI' THEN mv.floatValue END) AS bmi,
-            MAX(CASE WHEN mt.key = 'BODY_FAT' THEN mv.floatValue END) AS body_fat,
-            MAX(CASE WHEN mt.key = 'MUSCLE' THEN mv.floatValue END) AS muscle,
-            MAX(CASE WHEN mt.key = 'LBM' THEN mv.floatValue END) AS lbm,
-            MAX(CASE WHEN mt.key = 'BONE' THEN mv.floatValue END) AS bone,
-            MAX(CASE WHEN mt.key = 'WATER' THEN mv.floatValue END) AS water,
-            MAX(CASE WHEN mt.key = 'VISCERAL_FAT' THEN mv.floatValue END) AS visceral_fat,
-            MAX(CASE WHEN mt.key = 'BMR' THEN mv.floatValue END) AS bmr,
-            MAX(CASE WHEN mt.key = 'PROTEIN' THEN mv.floatValue END) AS protein,
-            MAX(CASE WHEN mt.key = 'IMPEDANCE' THEN mv.floatValue END) AS impedance,
-            MAX(CASE WHEN mt.key = 'COMMENT' THEN mv.textValue END) AS comment
-        FROM Measurement m
-        LEFT JOIN MeasurementValue mv ON mv.measurementId = m.id
-        LEFT JOIN MeasurementType mt ON mt.id = mv.typeId
-        GROUP BY m.id, m.timestamp
-        HAVING weight IS NOT NULL
-        ORDER BY m.timestamp
-    """
-
     con = sqlite3.connect(db_path)
     try:
         cur = con.cursor()
@@ -228,9 +267,17 @@ def read_measurements_from_db(db_path: Path, tz) -> list[list]:
         if cur.fetchone() is None:
             raise RuntimeError("Plik backupu nie zawiera tabeli Measurement (niepoprawny backup openScale)")
 
+        cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='MeasurementType'")
+        if cur.fetchone() is None:
+            raise RuntimeError("Plik backupu nie zawiera tabeli MeasurementType (niepoprawny backup openScale)")
+
+        type_columns = _table_columns(con, "MeasurementType")
+        query = build_measurements_query(type_columns)
+        print(f"  Schema MeasurementType: {describe_measurement_type_schema(type_columns)}")
+
         cur.execute("SELECT COUNT(*) FROM Measurement")
         measurement_count = int(cur.fetchone()[0])
-        columns = {row[1] for row in cur.execute("PRAGMA table_info(Measurement)")}
+        columns = _table_columns(con, "Measurement")
         if "userId" in columns:
             dump_sql = "SELECT id, userId, timestamp FROM Measurement ORDER BY timestamp"
         else:

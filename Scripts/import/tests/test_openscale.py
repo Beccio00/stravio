@@ -15,7 +15,9 @@ from jarvis_import.drive import DriveFile, is_openscale_backup_name, pick_latest
 from jarvis_import.importers.openscale import (
     COL_DATETIME,
     COL_WEIGHT,
+    build_measurements_query,
     extract_db_path,
+    measurement_type_predicate,
     read_openscale_rows,
     zip_db_members,
 )
@@ -26,6 +28,7 @@ WARSAW = ZoneInfo("Europe/Warsaw")
 
 
 def _create_openscale_db(path: Path, measurements: list[tuple[int, int, float]]) -> None:
+    """Schema openScale ≤15: MeasurementType.key = 'WEIGHT'."""
     con = sqlite3.connect(path)
     try:
         con.execute("CREATE TABLE Measurement (id INTEGER PRIMARY KEY, timestamp INTEGER)")
@@ -41,6 +44,71 @@ def _create_openscale_db(path: Path, measurements: list[tuple[int, int, float]])
                 "INSERT INTO MeasurementValue (measurementId, typeId, floatValue) VALUES (?, 1, ?)",
                 (mid, weight),
             )
+        con.commit()
+    finally:
+        con.close()
+
+
+def _create_openscale_db_identity(
+    path: Path,
+    measurements: list[tuple[int, int, float, float | None, str | None]],
+) -> None:
+    """Schema openScale ≥16: MeasurementType.identity = 'builtin.weight' (produkcja 2026-09)."""
+    con = sqlite3.connect(path)
+    try:
+        con.execute(
+            "CREATE TABLE Measurement ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, "
+            "userId INTEGER NOT NULL, timestamp INTEGER NOT NULL)"
+        )
+        con.execute(
+            "CREATE TABLE MeasurementType ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, "
+            "identity TEXT NOT NULL, name TEXT, color INTEGER NOT NULL, "
+            "icon TEXT NOT NULL, unit TEXT NOT NULL, inputType TEXT NOT NULL, "
+            "displayOrder INTEGER NOT NULL, isDerived INTEGER NOT NULL, "
+            "isEnabled INTEGER NOT NULL, isPinned INTEGER NOT NULL, "
+            "isOnRightYAxis INTEGER NOT NULL, isInternal INTEGER NOT NULL)"
+        )
+        con.execute(
+            "CREATE TABLE MeasurementValue ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, "
+            "measurementId INTEGER NOT NULL, typeId INTEGER NOT NULL, "
+            "floatValue REAL, intValue INTEGER, textValue TEXT, dateValue INTEGER)"
+        )
+        types = [
+            (1, "builtin.weight", "FLOAT"),
+            (2, "builtin.bmi", "FLOAT"),
+            (3, "builtin.body_fat", "FLOAT"),
+            (31, "builtin.comment", "TEXT"),
+        ]
+        for type_id, identity, input_type in types:
+            con.execute(
+                "INSERT INTO MeasurementType "
+                "(id, identity, name, color, icon, unit, inputType, displayOrder, "
+                "isDerived, isEnabled, isPinned, isOnRightYAxis, isInternal) "
+                "VALUES (?, ?, NULL, 0, 'IC_DEFAULT', 'NONE', ?, 0, 0, 1, 0, 0, 0)",
+                (type_id, identity, input_type),
+            )
+        for mid, timestamp_ms, weight, bmi, comment in measurements:
+            con.execute(
+                "INSERT INTO Measurement (id, userId, timestamp) VALUES (?, 1, ?)",
+                (mid, timestamp_ms),
+            )
+            con.execute(
+                "INSERT INTO MeasurementValue (measurementId, typeId, floatValue) VALUES (?, 1, ?)",
+                (mid, weight),
+            )
+            if bmi is not None:
+                con.execute(
+                    "INSERT INTO MeasurementValue (measurementId, typeId, floatValue) VALUES (?, 2, ?)",
+                    (mid, bmi),
+                )
+            if comment:
+                con.execute(
+                    "INSERT INTO MeasurementValue (measurementId, typeId, textValue) VALUES (?, 31, ?)",
+                    (mid, comment),
+                )
         con.commit()
     finally:
         con.close()
@@ -153,6 +221,95 @@ class ZipExtractTests(unittest.TestCase):
             self.assertEqual(len(rows), 1)
             self.assertEqual(rows[0][COL_WEIGHT], 97.4)
             self.assertTrue(rows[0][COL_DATETIME].startswith("20"))
+
+
+class MeasurementTypeSchemaTests(unittest.TestCase):
+    def test_predicate_uses_identity_when_present(self):
+        self.assertEqual(
+            measurement_type_predicate({"identity", "name"}, "WEIGHT"),
+            "mt.identity = 'builtin.weight'",
+        )
+        self.assertEqual(
+            measurement_type_predicate({"identity", "name"}, "BODY_FAT"),
+            "mt.identity = 'builtin.body_fat'",
+        )
+
+    def test_predicate_falls_back_to_legacy_key(self):
+        self.assertEqual(
+            measurement_type_predicate({"key", "id"}, "WEIGHT"),
+            "mt.key = 'WEIGHT'",
+        )
+
+    def test_predicate_prefers_identity_over_legacy_key(self):
+        self.assertEqual(
+            measurement_type_predicate({"key", "identity"}, "COMMENT"),
+            "mt.identity = 'builtin.comment'",
+        )
+
+    def test_unknown_schema_raises(self):
+        with self.assertRaisesRegex(RuntimeError, "identity ani key"):
+            measurement_type_predicate({"id", "name"}, "WEIGHT")
+
+    def test_query_does_not_reference_mt_key_on_identity_schema(self):
+        sql = build_measurements_query({"identity"})
+        self.assertNotIn("mt.key", sql)
+        self.assertIn("mt.identity = 'builtin.weight'", sql)
+        self.assertIn("mt.identity = 'builtin.comment'", sql)
+
+    def test_reads_identity_schema_like_production_backup(self):
+        """Reprodukuje błąd CI: 'no such column: mt.key' na backupie openScale ≥16."""
+        with tempfile.TemporaryDirectory() as raw:
+            db_path = Path(raw) / "openScale.db"
+            _create_openscale_db_identity(
+                db_path,
+                [
+                    (7, 1_786_280_040_000, 99.4, 27.53, None),
+                    (26, 1_789_014_240_000, 96.4, 26.70, "rano"),
+                ],
+            )
+            rows = read_openscale_rows(db_path, WARSAW)
+            self.assertEqual(len(rows), 2)
+            self.assertEqual(rows[0][COL_WEIGHT], 99.4)
+            self.assertEqual(rows[0][2], 27.53)  # BMI
+            self.assertEqual(rows[0][12], "")  # komentarz
+            self.assertEqual(rows[1][COL_WEIGHT], 96.4)
+            self.assertEqual(rows[1][12], "rano")
+            self.assertEqual(rows[1][13], "openScale")
+
+    def test_read_rejects_measurement_type_without_key_or_identity(self):
+        with tempfile.TemporaryDirectory() as raw:
+            db_path = Path(raw) / "openScale.db"
+            con = sqlite3.connect(db_path)
+            try:
+                con.execute("CREATE TABLE Measurement (id INTEGER PRIMARY KEY, timestamp INTEGER)")
+                con.execute("CREATE TABLE MeasurementType (id INTEGER PRIMARY KEY, name TEXT)")
+                con.execute(
+                    "INSERT INTO Measurement (id, timestamp) VALUES (1, 1724000000000)"
+                )
+                con.commit()
+            finally:
+                con.close()
+            with self.assertRaisesRegex(RuntimeError, "identity ani key"):
+                read_openscale_rows(db_path, WARSAW)
+
+    def test_identity_schema_zip_with_wal(self):
+        with tempfile.TemporaryDirectory() as raw:
+            tmp = Path(raw)
+            db_path = tmp / "openScale.db"
+            con = sqlite3.connect(db_path)
+            con.execute("PRAGMA journal_mode=WAL")
+            con.close()
+            _create_openscale_db_identity(db_path, [(1, 1_724_000_000_000, 80.0, 24.5, None)])
+            zip_path = tmp / "openScale.db_auto_backup.zip"
+            with zipfile.ZipFile(zip_path, "w") as archive:
+                archive.write(db_path, "openScale.db")
+                wal_path = tmp / "openScale.db-wal"
+                if wal_path.exists():
+                    archive.write(wal_path, "openScale.db-wal")
+            rows = read_openscale_rows(zip_path, WARSAW)
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0][COL_WEIGHT], 80.0)
+            self.assertEqual(rows[0][2], 24.5)
 
 
 class DateRangeTests(unittest.TestCase):
