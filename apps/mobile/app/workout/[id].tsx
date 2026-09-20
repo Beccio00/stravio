@@ -46,6 +46,7 @@ import {
   type ExerciseLogDraft,
 } from "../../src/components/ExerciseLogForm";
 import { addCatalogExerciseToSheet } from "../../src/lib/addCatalogExercise";
+import { isFreestyleSheetName } from "../../src/lib/ensureFreestyleSheet";
 import { getAutofillPrevious } from "../../src/lib/appPreferences";
 import { discardSessionExercise } from "../../src/lib/discardSessionExercise";
 import { hapticSuccess } from "../../src/lib/haptics";
@@ -192,10 +193,18 @@ export default function WorkoutScreen() {
   const [savingExerciseId, setSavingExerciseId] = useState<string | null>(null);
   const [discardingExerciseId, setDiscardingExerciseId] = useState<string | null>(null);
   const [autofillPrevious, setAutofillPrevious] = useState(true);
+  const planSeededRef = useRef(false);
 
   useEffect(() => {
     getAutofillPrevious().then(setAutofillPrevious);
   }, []);
+
+  useEffect(() => {
+    if (!sheet || isFreestyleSheetName(sheet.name) || planSeededRef.current) return;
+    if (sheet.exercises.length === 0) return;
+    planSeededRef.current = true;
+    setSessionExerciseIds(new Set(sheet.exercises.map((exercise) => exercise.id)));
+  }, [sheet]);
 
   const previousByExercise = useMemo(() => {
     const map: Record<string, SessionSetLog> = {};
@@ -452,7 +461,9 @@ export default function WorkoutScreen() {
                   Trening w trakcie
                 </Text>
               </View>
-              <Text className="text-text-primary text-xl font-bold mt-0.5 leading-tight">Freestyle</Text>
+              <Text className="text-text-primary text-xl font-bold mt-0.5 leading-tight" numberOfLines={1}>
+                {isFreestyleSheetName(sheet.name) ? "Freestyle" : sheet.name}
+              </Text>
               {session?.startedAt ? (
                 <TouchableOpacity
                   onPress={() => setShowEditStart(true)}

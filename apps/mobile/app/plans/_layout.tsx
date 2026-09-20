@@ -1,6 +1,6 @@
 import { Stack } from "expo-router";
 
-export default function SheetLayout() {
+export default function PlansLayout() {
   return (
     <Stack
       screenOptions={{
@@ -11,7 +11,7 @@ export default function SheetLayout() {
         contentStyle: { backgroundColor: "#0b1220" },
       }}
     >
-          <Stack.Screen name="[id]" options={{ title: "Plan", headerBackTitle: "Plany" }} />
+      <Stack.Screen name="index" options={{ title: "Plany", headerBackTitle: "Główna" }} />
     </Stack>
   );
 }

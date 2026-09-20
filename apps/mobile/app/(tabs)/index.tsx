@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Platform, Text, View } from "react-native";
+import { Alert, Platform, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { Clock3, Dumbbell, Flame, Play, TrendingUp } from "lucide-react-native";
+import { ClipboardList, Clock3, Dumbbell, Flame, Play, TrendingUp } from "lucide-react-native";
 import {
   computeSessionLiveStats,
   formatDuration,
@@ -12,10 +12,10 @@ import {
 import { APP_NAME } from "../../src/constants/branding";
 import { api } from "../../src/api/client";
 import {
+  useAnyIncompleteSession,
   useCompletedSessions,
   useCreateSession,
   useDeleteSession,
-  useIncompleteSession,
   useSession,
 } from "../../src/api/hooks";
 import { ensureFreestyleSheet } from "../../src/lib/ensureFreestyleSheet";
@@ -34,19 +34,12 @@ export default function HomeScreen() {
   const deleteSession = useDeleteSession();
   const { data: completedSessions } = useCompletedSessions();
   const [isStarting, setIsStarting] = useState(false);
-  const [freestyleSheetId, setFreestyleSheetId] = useState<string | null>(null);
   const [elapsedSinceStart, setElapsedSinceStart] = useState(0);
 
   const lastSessionId = completedSessions?.[0]?.id ?? null;
   const { data: lastSession } = useSession(lastSessionId ?? "");
 
-  useEffect(() => {
-    ensureFreestyleSheet()
-      .then(({ sheetId }) => setFreestyleSheetId(sheetId))
-      .catch(() => {});
-  }, []);
-
-  const { data: incompleteSession } = useIncompleteSession(freestyleSheetId ?? undefined);
+  const { data: incompleteSession } = useAnyIncompleteSession();
 
   useEffect(() => {
     if (!incompleteSession?.startedAt) return;
@@ -114,8 +107,8 @@ export default function HomeScreen() {
   };
 
   const handleResumeWorkout = () => {
-    if (!incompleteSession || !freestyleSheetId) return;
-    router.push(`/workout/${incompleteSession.id}?sheetId=${freestyleSheetId}`);
+    if (!incompleteSession) return;
+    router.push(`/workout/${incompleteSession.id}?sheetId=${incompleteSession.sheetId}`);
   };
 
   const confirmCancelWorkout = () => {
@@ -141,14 +134,14 @@ export default function HomeScreen() {
           title={APP_NAME}
           subtitle={
             thisMonthCount > 0
-              ? `${thisMonthCount} ${thisMonthCount === 1 ? "trening" : "treningi"} w tym miesiącu — wybieraj ćwiczenia na bieżąco.`
-              : "Freestyle — odpal trening i wybieraj ćwiczenia z katalogu."
+              ? `${thisMonthCount} ${thisMonthCount === 1 ? "trening" : "treningi"} w tym miesiącu — freestyle albo plan.`
+              : "Wybierz: ćwiczenia na bieżąco albo przygotowany plan."
           }
           icon={Dumbbell}
         />
       </View>
 
-      <View className="flex-1 px-5 pt-4">
+      <ScrollView className="flex-1 px-5 pt-4" contentContainerStyle={{ paddingBottom: 32 }}>
         {incompleteSession ? (
           <Card padding="lg" className="border-action-primary/30 bg-surface">
             <View className="flex-row items-center mb-2">
@@ -169,7 +162,7 @@ export default function HomeScreen() {
             </View>
 
             <Text className="text-text-secondary text-sm mt-2 leading-5">
-              Masz niedokończony trening z zapisanymi ćwiczeniami — wróć do niego, żeby nic nie zgubić.
+              Masz niedokończony trening — wróć do niego, żeby nic nie zgubić. Działa dla freestyle i planu.
             </Text>
 
             <Button
@@ -216,20 +209,27 @@ export default function HomeScreen() {
               </View>
               <View className="ml-3 flex-1">
                 <Text className="text-text-primary text-xl font-bold leading-tight">Gotowy do treningu?</Text>
-                <Text className="text-text-muted text-xs mt-0.5">Freestyle · katalog PPL</Text>
+                <Text className="text-text-muted text-xs mt-0.5">Freestyle albo plan z katalogu</Text>
               </View>
             </View>
 
             <Text className="text-text-secondary text-sm mt-2 leading-5">
-              Dodajesz ćwiczenia w trakcie sesji. Wpisujesz serie, ciężar i powtórzenia — resztę liczymy za Ciebie.
+              Freestyle — dobierasz ćwiczenia w trakcie. Plan — odpalasz gotowy układ z katalogu.
             </Text>
 
             <Button
-              label="Rozpocznij trening"
+              label="Freestyle"
               icon={Play}
               onPress={() => handleStartWorkout()}
               loading={isStarting || createSession.isPending}
               className="mt-5"
+            />
+            <Button
+              label="Wybierz plan"
+              icon={ClipboardList}
+              variant="secondary"
+              onPress={() => router.push("/plans")}
+              className="mt-3"
             />
           </Card>
         )}
@@ -255,10 +255,7 @@ export default function HomeScreen() {
           </Card>
         ) : null}
 
-        <Text className="text-text-muted text-xs text-center mt-8 px-4">
-          Gotowe plany treningowe (PPL) pojawią się w osobnej zakładce — wkrótce.
-        </Text>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }

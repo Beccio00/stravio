@@ -524,6 +524,19 @@ export const api = {
       return { session: lastSession, logs: (logRows ?? []).map(mapLog) };
     },
 
+    /** Latest unfinished session on any sheet — Home resume for freestyle and plans. */
+    findAnyIncomplete: async (): Promise<WorkoutSession | null> => {
+      const { data, error } = await supabase
+        .from("workout_sessions")
+        .select("*")
+        .is("completed_at", null)
+        .order("started_at", { ascending: false })
+        .limit(1);
+      if (error) throw new Error(error.message);
+      if (!data || data.length === 0) return null;
+      return mapSession(data[0]);
+    },
+
     /** Most recent not-yet-completed session for a sheet, if any — used to resume an in-progress workout. */
     findIncomplete: async (sheetId: string): Promise<WorkoutSession | null> => {
       const { data, error } = await supabase

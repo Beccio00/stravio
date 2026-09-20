@@ -298,6 +298,13 @@ export function useLastSessionBySheet(sheetId: string) {
   });
 }
 
+export function useAnyIncompleteSession() {
+  return useQuery({
+    queryKey: ["sessions", "incomplete", "any"],
+    queryFn: () => api.sessions.findAnyIncomplete(),
+  });
+}
+
 /** Not-yet-completed session for a sheet, if any — lets Home offer "Kontynuuj trening" instead of starting a new one. */
 export function useIncompleteSession(sheetId: string | undefined) {
   return useQuery({
