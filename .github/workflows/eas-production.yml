@@ -1,45 +1,41 @@
 name: EAS Production Build & Update
 
+# Both jobs are manual (Actions → Run workflow) on purpose:
+# - EAS build minutes on the free tier are limited, so we don't build on every push.
+# - OTA updates require expo-updates + runtimeVersion in app.json, which are not
+#   configured yet. Once they are, the `update` job can be moved to `push: main`.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
-      platform:
-        description: Platform to build
+      action:
+        description: What to run
         required: true
-        default: all
+        default: build
+        type: choice
+        options: [build, update]
+      platform:
+        description: Platform to build (ignored for update)
+        required: true
+        default: android
         type: choice
         options: [all, android, ios]
+      profile:
+        description: EAS build profile (ignored for update)
+        required: true
+        default: preview
+        type: choice
+        options: [preview, production]
+      message:
+        description: OTA update message (ignored for build)
+        required: false
+        default: Manual OTA update
+        type: string
 
 jobs:
-  eas-update:
-    name: OTA Update (production)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-
-      - uses: expo/expo-github-action@v8
-        with:
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Publish OTA update
-        working-directory: apps/mobile
-        run: eas update --branch production --message "${{ github.event.head_commit.message }}" --non-interactive
-
   eas-build:
-    name: Native build (production)
+    name: Native build
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch'
+    if: inputs.action == 'build'
     steps:
       - uses: actions/checkout@v4
 
@@ -58,4 +54,33 @@ jobs:
 
       - name: Build on EAS
         working-directory: apps/mobile
-        run: eas build --platform ${{ inputs.platform }} --profile production --non-interactive --no-wait
+        env:
+          PLATFORM: ${{ inputs.platform }}
+          PROFILE: ${{ inputs.profile }}
+        run: eas build --platform "$PLATFORM" --profile "$PROFILE" --non-interactive --no-wait
+
+  eas-update:
+    name: OTA update (production)
+    runs-on: ubuntu-latest
+    if: inputs.action == 'update'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Publish OTA update
+        working-directory: apps/mobile
+        env:
+          MESSAGE: ${{ inputs.message }}
+        run: eas update --branch production --message "$MESSAGE" --non-interactive
