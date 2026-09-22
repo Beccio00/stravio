@@ -5,11 +5,15 @@ import { useRouter } from "expo-router";
 import {
   Check,
   ChevronRight,
+  Copy,
   GripVertical,
+  MoreHorizontal,
   PencilLine,
+  Trash2,
   Plus,
   SquarePen,
 } from "lucide-react-native";
+import type { LucideIcon } from "lucide-react-native";
 import DraggableFlatList, { ScaleDecorator } from "react-native-draggable-flatlist";
 import type { RenderItemParams } from "react-native-draggable-flatlist";
 import { TouchableOpacity as GHTouchableOpacity } from "react-native-gesture-handler";
@@ -47,6 +51,7 @@ export default function HomeScreen() {
   const [newSheetName, setNewSheetName] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [editingSheetId, setEditingSheetId] = useState<string | null>(null);
+  const [menuSheetId, setMenuSheetId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
   const [listData, setListData] = useState<WorkoutSheet[]>([]);
 
@@ -89,36 +94,29 @@ export default function HomeScreen() {
   };
 
   const beginRename = (item: WorkoutSheet) => {
+    setMenuSheetId(null);
     setEditingSheetId(item.id);
     setRenameDraft(item.name);
   };
 
-  const openSheetMenu = (item: WorkoutSheet) => {
-    if (Platform.OS === "web") {
-      const choice = window.prompt(
-        `"${item.name}"\n\nType an action: rename / duplicate / delete`,
-      );
-      if (!choice) return;
-      const action = choice.trim().toLowerCase();
-      if (action === "rename") {
-        beginRename(item);
-      } else if (action === "duplicate") {
-        duplicateSheet.mutate(item.id);
-      } else if (action === "delete") {
-        handleDelete(item.id, item.name);
-      }
-    } else {
-      Alert.alert(item.name, "Choose an action", [
-        { text: "Rename", onPress: () => beginRename(item) },
-        { text: "Duplicate", onPress: () => duplicateSheet.mutate(item.id) },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => handleDelete(item.id, item.name),
-        },
-        { text: "Cancel", style: "cancel" },
-      ]);
-    }
+  const handleDuplicate = (item: WorkoutSheet) => {
+    setMenuSheetId(null);
+    duplicateSheet.mutate(item.id, {
+      onError: (err) => {
+        const msg = err instanceof Error ? err.message : "Could not duplicate sheet";
+        if (Platform.OS === "web") {
+          window.alert(msg);
+        } else {
+          Alert.alert("Duplicate failed", msg);
+        }
+      },
+    });
+  };
+
+  // Inline action menu (works the same on web and native; long-press on
+  // native is just a shortcut to open it).
+  const toggleSheetMenu = (item: WorkoutSheet) => {
+    setMenuSheetId((current) => (current === item.id ? null : item.id));
   };
 
   const applyRename = () => {
@@ -149,13 +147,14 @@ export default function HomeScreen() {
 
   const renderSheet = ({ item, drag, isActive }: RenderItemParams<WorkoutSheet>) => {
     const isEditing = editingSheetId === item.id;
+    const isMenuOpen = menuSheetId === item.id;
 
     return (
       <ScaleDecorator>
         <GHTouchableOpacity
           className="w-full"
           onPress={() => router.push(`/sheet/${item.id}`)}
-          onLongPress={() => openSheetMenu(item)}
+          onLongPress={() => toggleSheetMenu(item)}
           delayLongPress={350}
           disabled={isEditing}
           activeOpacity={0.75}
@@ -212,12 +211,19 @@ export default function HomeScreen() {
                     <TouchableOpacity
                       onPress={(event) => {
                         event.stopPropagation();
-                        beginRename(item);
+                        toggleSheetMenu(item);
                       }}
-                      className="mr-2 h-9 w-9 items-center justify-center rounded-xl bg-action-secondary border border-border"
-                      accessibilityLabel="Rename sheet"
+                      className={`mr-2 h-9 w-9 items-center justify-center rounded-xl border ${
+                        isMenuOpen ? "bg-action-primary border-action-primary" : "bg-action-secondary border-border"
+                      }`}
+                      accessibilityLabel="Sheet options"
+                      accessibilityRole="button"
                     >
-                      <PencilLine size={ICON_SIZE} strokeWidth={ICON_STROKE} color="#c0c9d8" />
+                      <MoreHorizontal
+                        size={ICON_SIZE}
+                        strokeWidth={ICON_STROKE}
+                        color={isMenuOpen ? "#ffffff" : "#c0c9d8"}
+                      />
                     </TouchableOpacity>
                     <View className="w-4 items-center">
                       <ChevronRight size={ICON_SIZE} strokeWidth={ICON_STROKE} color="#7c8aa5" />
@@ -226,6 +232,31 @@ export default function HomeScreen() {
                 </View>
               )}
             </View>
+
+            {isMenuOpen && !isEditing ? (
+              <View className="mt-3 flex-row gap-2 border-t border-border pt-3">
+                <SheetAction
+                  label="Rename"
+                  icon={PencilLine}
+                  onPress={() => beginRename(item)}
+                />
+                <SheetAction
+                  label="Duplicate"
+                  icon={Copy}
+                  onPress={() => handleDuplicate(item)}
+                  loading={duplicateSheet.isPending}
+                />
+                <SheetAction
+                  label="Delete"
+                  icon={Trash2}
+                  tone="danger"
+                  onPress={() => {
+                    setMenuSheetId(null);
+                    handleDelete(item.id, item.name);
+                  }}
+                />
+              </View>
+            ) : null}
           </Card>
         </GHTouchableOpacity>
       </ScaleDecorator>
@@ -272,7 +303,7 @@ export default function HomeScreen() {
               reorderSheets.mutate(data.map((s) => s.id));
             }
           }}
-          extraData={[editingSheetId, renameDraft, updateSheet.isPending, reorderSheets.isPending]}
+          extraData={[editingSheetId, menuSheetId, renameDraft, updateSheet.isPending, reorderSheets.isPending, duplicateSheet.isPending]}
           contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 140 }}
           ListEmptyComponent={
             <StateBlock
@@ -333,5 +364,34 @@ export default function HomeScreen() {
         <Plus size={22} strokeWidth={2.4} color="#ffffff" />
       </TouchableOpacity>
     </SafeAreaView>
+  );
+}
+
+function SheetAction({
+  label,
+  icon,
+  onPress,
+  tone = "default",
+  loading = false,
+}: {
+  label: string;
+  icon: LucideIcon;
+  onPress: () => void;
+  tone?: "default" | "danger";
+  loading?: boolean;
+}) {
+  return (
+    <Button
+      label={label}
+      icon={icon}
+      size="sm"
+      variant={tone === "danger" ? "danger" : "secondary"}
+      onPress={(event) => {
+        event.stopPropagation();
+        onPress();
+      }}
+      loading={loading}
+      className="flex-1"
+    />
   );
 }
