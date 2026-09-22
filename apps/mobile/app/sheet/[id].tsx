@@ -68,7 +68,9 @@ export default function SheetDetailScreen() {
   const reorderExercises = useReorderExercises(sheetId);
   const { data: activeSessions } = useActiveSessions();
   const closeSession = useCloseSession();
-  const activeSession = activeSessions?.find((s) => s.sheetId === sheetId);
+  // Only one workout can be in progress at a time, on any sheet.
+  const activeSession = activeSessions?.[0];
+  const isActiveHere = activeSession?.sheetId === sheetId;
 
   const [newExerciseName, setNewExerciseName] = useState("");
   const [showAddExercise, setShowAddExercise] = useState(false);
@@ -178,21 +180,14 @@ export default function SheetDetailScreen() {
     );
   };
 
-  const handleStartWorkout = () => {
-    // Resume instead of silently starting a second session on the same sheet.
-    if (activeSession) {
-      router.push(`/workout/${activeSession.id}?sheetId=${sheetId}`);
-      return;
-    }
-    startSession();
-  };
-
-  const handleStartFresh = () => {
+  /** Closes the session in progress (kept in history if it has logged sets), then starts a new one. */
+  const confirmStartFresh = () => {
     if (!activeSession) return startSession();
 
     const title = "Start a new workout";
-    const message =
-      "The workout in progress will be closed. Sets you already marked as done stay in your history.";
+    const message = isActiveHere
+      ? "The workout in progress on this sheet will be closed. Sets you already marked as done stay in your history."
+      : `You already have a workout in progress on "${activeSession.sheetName}". Starting this one will close it. Sets you already marked as done stay in your history.`;
     const run = () => closeSession.mutate(activeSession.id, { onSuccess: startSession });
 
     if (Platform.OS === "web") {
@@ -200,9 +195,18 @@ export default function SheetDetailScreen() {
     } else {
       Alert.alert(title, message, [
         { text: "Cancel", style: "cancel" },
-        { text: "Start new", onPress: run },
+        { text: "Start new", style: "destructive", onPress: run },
       ]);
     }
+  };
+
+  const handleStartWorkout = () => {
+    // Same sheet → resume it; another sheet (or none) → start after confirming.
+    if (isActiveHere && activeSession) {
+      router.push(`/workout/${activeSession.id}?sheetId=${sheetId}`);
+      return;
+    }
+    confirmStartFresh();
   };
 
   const renderExercise = ({ item: exercise, drag, isActive }: RenderItemParams<ExerciseFull>) => (
@@ -259,23 +263,23 @@ export default function SheetDetailScreen() {
               subtitle="Plan your sets, then start the session when ready."
               rightAction={
                 <View className="flex-row items-center">
-                  {activeSession ? (
+                  {isActiveHere ? (
                     <Button
                       label="New"
                       icon={Plus}
                       size="sm"
                       variant="secondary"
-                      onPress={handleStartFresh}
+                      onPress={confirmStartFresh}
                       loading={closeSession.isPending}
                       className="mr-2"
                     />
                   ) : null}
                   <Button
-                    label={activeSession ? "Resume" : "Start"}
+                    label={isActiveHere ? "Resume" : "Start"}
                     icon={Play}
                     size="sm"
                     onPress={handleStartWorkout}
-                    loading={createSession.isPending}
+                    loading={createSession.isPending || closeSession.isPending}
                   />
                 </View>
               }
