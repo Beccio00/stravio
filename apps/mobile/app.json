@@ -43,7 +43,8 @@
           }
         }
       ],
-      ["expo-notifications", { "icon": "./assets/notification-icon.png", "color": "#3b82f6" }]
+      ["expo-notifications", { "icon": "./assets/notification-icon.png", "color": "#3b82f6" }],
+      "expo-document-picker"
     ],
     "extra": {
       "router": {

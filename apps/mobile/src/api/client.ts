@@ -7,6 +7,7 @@
  */
 
 import { supabase } from "../lib/supabase";
+import type { ImportedSheet } from "../lib/sheetsIO";
 import type {
   WorkoutSheet,
   WorkoutSheetFull,
@@ -256,6 +257,57 @@ export const api = {
       );
 
       return mapSheet(newSheet);
+    },
+
+    /** Adds sheets (with exercises and sets) from an imported file; existing sheets are untouched. */
+    import: async (sheets: ImportedSheet[]): Promise<void> => {
+      const userId = await getUserId();
+      // Imported sheets land above the existing ones, keeping their own order.
+      const baseOrder = (await topOrderIndex(userId)) - sheets.length + 1;
+
+      for (let si = 0; si < sheets.length; si++) {
+        const s = sheets[si];
+
+        const { data: sheetRow, error: sheetErr } = await supabase
+          .from("workout_sheets")
+          .insert({
+            user_id: userId,
+            name: s.name,
+            description: s.description ?? null,
+            order_index: baseOrder + si,
+          })
+          .select()
+          .single();
+        if (sheetErr) throw new Error(sheetErr.message);
+
+        for (let ei = 0; ei < s.exercises.length; ei++) {
+          const e = s.exercises[ei];
+          const { data: exRow, error: exErr } = await supabase
+            .from("exercises")
+            .insert({
+              sheet_id: sheetRow.id,
+              name: e.name,
+              notes: e.notes ?? null,
+              order_index: ei,
+            })
+            .select()
+            .single();
+          if (exErr) throw new Error(exErr.message);
+
+          if (e.sets.length > 0) {
+            const { error: setsErr } = await supabase.from("exercise_sets").insert(
+              e.sets.map((set) => ({
+                exercise_id: exRow.id,
+                set_number: set.setNumber,
+                reps: set.reps,
+                weight_kg: set.weightKg,
+                rest_time_sec: set.restTimeSec,
+              })),
+            );
+            if (setsErr) throw new Error(setsErr.message);
+          }
+        }
+      }
     },
 
     /** Persists list order: first id = top (order_index 0). */
