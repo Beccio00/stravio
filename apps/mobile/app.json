@@ -42,7 +42,8 @@
             "kotlinVersion": "1.9.25"
           }
         }
-      ]
+      ],
+      ["expo-notifications", { "icon": "./assets/notification-icon.png", "color": "#3b82f6" }]
     ],
     "extra": {
       "router": {
