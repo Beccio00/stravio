@@ -1,9 +1,9 @@
 import "../global.css";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { View, ActivityIndicator } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Stack, useRouter, useSegments } from "expo-router";
-import { QueryClient } from "@tanstack/react-query";
+import { QueryClient, useQueryClient } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { persister } from "../src/lib/queryPersister";
 import { StatusBar } from "expo-status-bar";
@@ -60,6 +60,21 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const { session, loading, configError } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const queryClient = useQueryClient();
+
+  // Drop cached data whenever the signed-in user changes (login, logout,
+  // account switch). Queries can run before the session is restored and the
+  // cache is persisted to disk, so without this a fresh login would keep
+  // showing stale/empty (or another user's) data until the next refetch.
+  const userId = session?.user.id ?? null;
+  const prevUserId = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    if (loading) return;
+    if (prevUserId.current !== undefined && prevUserId.current !== userId) {
+      queryClient.resetQueries();
+    }
+    prevUserId.current = userId;
+  }, [userId, loading]);
 
   useEffect(() => {
     if (loading || configError) return;

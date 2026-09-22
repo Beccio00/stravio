@@ -7,6 +7,8 @@ import { Platform, useColorScheme } from "react-native";
 export type ThemePreference = "dark" | "light" | "system";
 
 interface PreferencesState {
+  /** true while the stored theme is being read on native (web reads synchronously) */
+  loading: boolean;
   theme: ThemePreference;
   /** Resolved theme — "system" is resolved to the actual OS setting */
   resolvedTheme: "dark" | "light";
@@ -67,13 +69,16 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
   const [theme, setThemeState] = useState<ThemePreference>(
     () => readStoredSync() ?? "dark",
   );
+  const [loading, setLoading] = useState(Platform.OS !== "web");
 
   // Native only: hydrate from SecureStore after mount (no synchronous API)
   useEffect(() => {
     if (Platform.OS === "web") return;
-    readStoredNative().then((stored) => {
-      if (stored !== null) setThemeState(stored);
-    });
+    readStoredNative()
+      .then((stored) => {
+        if (stored !== null) setThemeState(stored);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const setTheme = useCallback((t: ThemePreference) => {
@@ -87,7 +92,7 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
       : theme;
 
   return (
-    <PreferencesContext.Provider value={{ theme, resolvedTheme, setTheme }}>
+    <PreferencesContext.Provider value={{ loading, theme, resolvedTheme, setTheme }}>
       {children}
     </PreferencesContext.Provider>
   );
