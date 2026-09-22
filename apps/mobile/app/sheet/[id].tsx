@@ -20,6 +20,8 @@ import {
   useDeleteSet,
   useCreateSession,
   useReorderExercises,
+  useActiveSessions,
+  useCloseSession,
 } from "../../src/api/hooks";
 import type { ExerciseFull, ExerciseSet } from "@bhmt3wp/shared";
 import { prefs } from "../../src/lib/preferences";
@@ -64,6 +66,9 @@ export default function SheetDetailScreen() {
   const createSession = useCreateSession();
   const updateSheet = useUpdateSheet();
   const reorderExercises = useReorderExercises(sheetId);
+  const { data: activeSessions } = useActiveSessions();
+  const closeSession = useCloseSession();
+  const activeSession = activeSessions?.find((s) => s.sheetId === sheetId);
 
   const [newExerciseName, setNewExerciseName] = useState("");
   const [showAddExercise, setShowAddExercise] = useState(false);
@@ -162,7 +167,7 @@ export default function SheetDetailScreen() {
     });
   };
 
-  const handleStartWorkout = () => {
+  const startSession = () => {
     createSession.mutate(
       { sheetId },
       {
@@ -171,6 +176,33 @@ export default function SheetDetailScreen() {
         },
       },
     );
+  };
+
+  const handleStartWorkout = () => {
+    // Resume instead of silently starting a second session on the same sheet.
+    if (activeSession) {
+      router.push(`/workout/${activeSession.id}?sheetId=${sheetId}`);
+      return;
+    }
+    startSession();
+  };
+
+  const handleStartFresh = () => {
+    if (!activeSession) return startSession();
+
+    const title = "Start a new workout";
+    const message =
+      "The workout in progress will be closed. Sets you already marked as done stay in your history.";
+    const run = () => closeSession.mutate(activeSession.id, { onSuccess: startSession });
+
+    if (Platform.OS === "web") {
+      if (window.confirm(`${title}\n\n${message}`)) run();
+    } else {
+      Alert.alert(title, message, [
+        { text: "Cancel", style: "cancel" },
+        { text: "Start new", onPress: run },
+      ]);
+    }
   };
 
   const renderExercise = ({ item: exercise, drag, isActive }: RenderItemParams<ExerciseFull>) => (
@@ -226,13 +258,26 @@ export default function SheetDetailScreen() {
               title={sheet.name}
               subtitle="Plan your sets, then start the session when ready."
               rightAction={
-                <Button
-                  label="Start"
-                  icon={Play}
-                  size="sm"
-                  onPress={handleStartWorkout}
-                  loading={createSession.isPending}
-                />
+                <View className="flex-row items-center">
+                  {activeSession ? (
+                    <Button
+                      label="New"
+                      icon={Plus}
+                      size="sm"
+                      variant="secondary"
+                      onPress={handleStartFresh}
+                      loading={closeSession.isPending}
+                      className="mr-2"
+                    />
+                  ) : null}
+                  <Button
+                    label={activeSession ? "Resume" : "Start"}
+                    icon={Play}
+                    size="sm"
+                    onPress={handleStartWorkout}
+                    loading={createSession.isPending}
+                  />
+                </View>
               }
             />
 
