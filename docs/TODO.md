@@ -57,7 +57,7 @@
 - [x] **Deploy web app to Vercel** – Run `vercel --prod` from root or connect GitHub repo to Vercel dashboard.
 - [X] **Sheet card tap target** – Make the entire sheet card tappable, not only the sheet name.
 - [X] **Set autofill from previous set** – When creating a new set, prefill weight, reps, and rest from the previous set in that exercise.
-- [X] **Custom splash screen, icon, and favicon** – Replace default Expo assets and use `./logo.png` (512x512) as app icon plus `./favicon.ico` for web favicon.
+- [X] **Custom splash screen, icon, and favicon** – Brand assets in `apps/mobile/assets/` (app icon, Android adaptive icon, splash lockup, web favicon).
 - [X] **Workout statistics** – Charts showing progress over time (weight lifted, volume, frequency).
 - [X] **Push notifications** – Workout reminders (Expo Notifications).
 - [X] **Drag-to-reorder exercises** – Within a sheet, reorder exercises by dragging.

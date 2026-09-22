@@ -1,6 +1,13 @@
-# Stravio
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="apps/mobile/assets/stravio-lockup-scuro.png" />
+    <img src="apps/mobile/assets/stravio-lockup-chiaro.png" width="420" alt="Stravio" />
+  </picture>
+</p>
 
-Stravio is an open source workout sheet manager. Create workout sheets, log sessions in real-time, and track progress on Android, iOS, and Web.
+<p align="center">
+  Open source workout sheet manager — build your sheets, log every set in real time, and track progress on Android, iOS and Web.
+</p>
 
 <p align="center">
   <img src="docs/screenshots/login.png" width="200" alt="Login" />

@@ -9,7 +9,9 @@
     "userInterfaceStyle": "dark",
     "newArchEnabled": false,
     "splash": {
-      "backgroundColor": "#1a1a2e"
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#121d39"
     },
     "ios": {
       "supportsTablet": true,
@@ -17,7 +19,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#1a1a2e"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0881f2"
       },
       "package": "com.bhmt3wp.stravio"
     },
@@ -43,7 +46,13 @@
           }
         }
       ],
-      ["expo-notifications", { "icon": "./assets/notification-icon.png", "color": "#3b82f6" }],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#3b82f6"
+        }
+      ],
       "expo-document-picker"
     ],
     "extra": {
