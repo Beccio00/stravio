@@ -18,6 +18,7 @@ import {
   useSessionExerciseNotes,
   useSheet,
   useUnlogSessionSet,
+  useUpdateExercise,
   useUpsertExerciseNote,
   useUpdateSet,
 } from "../../src/api/hooks";
@@ -71,6 +72,7 @@ export default function WorkoutScreen() {
   const unlogSet = useUnlogSessionSet();
   const completeSession = useCompleteSession();
   const updateSet = useUpdateSet(sheetId!);
+  const updateExercise = useUpdateExercise(sheetId!);
   const { data: lastSessionData } = useLastSessionBySheet(sheetId!);
   const { data: exerciseNotes } = useSessionExerciseNotes(sessionId);
   const upsertNote = useUpsertExerciseNote();
@@ -290,6 +292,15 @@ export default function WorkoutScreen() {
       try {
         await completeSession.mutateAsync(sessionId);
         await clearSessionState(sessionId);
+
+        // Carry the session notes back to the sheet template so the next
+        // workout starts from what the user wrote today.
+        for (const [exerciseId, noteText] of Object.entries(notes)) {
+          const trimmed = noteText.trim();
+          if (trimmed) {
+            updateExercise.mutate({ id: exerciseId, notes: trimmed });
+          }
+        }
         if (router.canDismiss()) {
           router.dismissAll();
         }

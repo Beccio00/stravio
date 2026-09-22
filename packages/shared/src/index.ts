@@ -173,4 +173,5 @@ export interface SessionDetailFull extends WorkoutSession {
   sheetName: string;
   logs: SessionSetLog[];
   exercises: SessionExerciseGroup[];
+  exerciseNotes: SessionExerciseNote[];
 }
