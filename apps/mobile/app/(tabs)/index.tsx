@@ -4,7 +4,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import {
   Check,
-  ChevronRight,
   Copy,
   GripVertical,
   MoreHorizontal,
@@ -213,7 +212,7 @@ export default function HomeScreen() {
 
                 <TouchableOpacity
                   onPress={() => toggleSheetMenu(item)}
-                  className={`ml-2 mr-2 h-9 w-9 items-center justify-center rounded-xl border ${
+                  className={`ml-2 h-9 w-9 items-center justify-center rounded-xl border ${
                     isMenuOpen ? "bg-action-primary border-action-primary" : "bg-action-secondary border-border"
                   }`}
                   accessibilityLabel="Sheet options"
@@ -225,9 +224,6 @@ export default function HomeScreen() {
                     color={isMenuOpen ? "#ffffff" : "#c0c9d8"}
                   />
                 </TouchableOpacity>
-                <View className="w-4 items-center">
-                  <ChevronRight size={ICON_SIZE} strokeWidth={ICON_STROKE} color="#7c8aa5" />
-                </View>
               </>
             )}
           </View>
