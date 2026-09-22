@@ -192,20 +192,24 @@ export default function HomeScreen() {
               </View>
             ) : (
               <>
-                <GHTouchableOpacity
-                  className="flex-1 min-w-0 py-1"
-                  onPress={() => router.push(`/sheet/${item.id}`)}
-                  onLongPress={() => toggleSheetMenu(item)}
-                  delayLongPress={350}
-                  activeOpacity={0.75}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Open ${item.name}`}
-                >
-                  <Text className="text-text-primary text-lg font-bold" numberOfLines={1}>
-                    {item.name}
-                  </Text>
-                  <Text className="text-text-muted text-xs mt-1">Tap to open workout plan</Text>
-                </GHTouchableOpacity>
+                {/* Fills the row so the whole card area (minus the buttons)
+                    opens the sheet, and pushes the actions to the right edge. */}
+                <View className="flex-1 min-w-0">
+                  <GHTouchableOpacity
+                    className="w-full py-1"
+                    onPress={() => router.push(`/sheet/${item.id}`)}
+                    onLongPress={() => toggleSheetMenu(item)}
+                    delayLongPress={350}
+                    activeOpacity={0.75}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Open ${item.name}`}
+                  >
+                    <Text className="text-text-primary text-lg font-bold" numberOfLines={1}>
+                      {item.name}
+                    </Text>
+                    <Text className="text-text-muted text-xs mt-1">Tap to open workout plan</Text>
+                  </GHTouchableOpacity>
+                </View>
 
                 <TouchableOpacity
                   onPress={() => toggleSheetMenu(item)}
