@@ -376,6 +376,9 @@ export default function SheetDetailScreen() {
             />
           </View>
         }
+        // Without flex the wrapper takes its intrinsic height and the list
+        // cannot scroll on web.
+        containerStyle={{ flex: 1 }}
         contentContainerStyle={{ paddingBottom: 120 }}
       />
     </SafeAreaView>
