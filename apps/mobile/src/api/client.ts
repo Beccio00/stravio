@@ -121,6 +121,9 @@ async function topOrderIndex(userId: string): Promise<number> {
   return !minRows?.length ? 0 : ((minRows[0] as { order_index: number }).order_index ?? 0) - 1;
 }
 
+/** An in-progress session untouched for this long is closed automatically. */
+export const STALE_SESSION_HOURS = 6;
+
 // ---------------------------------------------------------------------------
 // API implementation
 // ---------------------------------------------------------------------------
@@ -387,6 +390,40 @@ export const api = {
       return (data ?? []).map(mapSession);
     },
 
+    /**
+     * Sessions still in progress (no completed_at), newest first.
+     *
+     * A session is only ever finished from the workout screen, so an app kill
+     * or an abandoned workout leaves it open forever. Anything older than
+     * STALE_SESSION_HOURS is closed first: completed if sets were logged,
+     * deleted if it is empty (an empty session would be noise in the history).
+     */
+    active: async (): Promise<WorkoutSessionWithSheet[]> => {
+      const { data, error } = await supabase
+        .from("workout_sessions")
+        .select("*, workout_sheets(name)")
+        .is("completed_at", null)
+        .order("started_at", { ascending: false });
+      if (error) throw new Error(error.message);
+
+      const rows = data ?? [];
+      const staleBefore = Date.now() - STALE_SESSION_HOURS * 60 * 60 * 1000;
+      const fresh: any[] = [];
+
+      for (const row of rows) {
+        if (new Date(row.started_at).getTime() >= staleBefore) {
+          fresh.push(row);
+          continue;
+        }
+        await api.sessions.close(row.id);
+      }
+
+      return fresh.map((s: any) => ({
+        ...mapSession(s),
+        sheetName: s.workout_sheets?.name ?? "Deleted sheet",
+      }));
+    },
+
     completed: async (): Promise<WorkoutSessionWithSheet[]> => {
       const { data: sessions, error } = await supabase
         .from("workout_sessions")
@@ -476,6 +513,19 @@ export const api = {
       }
 
       return mapSession(result);
+    },
+
+    /** Ends an abandoned session: completed if it has logged sets, deleted if empty. */
+    close: async (id: string): Promise<void> => {
+      const { count } = await supabase
+        .from("session_set_logs")
+        .select("id", { count: "exact", head: true })
+        .eq("session_id", id);
+      if (count && count > 0) {
+        await api.sessions.complete(id);
+      } else {
+        await api.sessions.delete(id);
+      }
     },
 
     complete: async (id: string): Promise<WorkoutSession> => {

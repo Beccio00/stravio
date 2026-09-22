@@ -5,12 +5,14 @@ import { useRouter } from "expo-router";
 import {
   Check,
   Copy,
+  Flame,
   GripVertical,
   MoreHorizontal,
   PencilLine,
-  Trash2,
+  Play,
   Plus,
   SquarePen,
+  Trash2,
 } from "lucide-react-native";
 import type { LucideIcon } from "lucide-react-native";
 import DraggableFlatList, { ScaleDecorator } from "react-native-draggable-flatlist";
@@ -19,6 +21,8 @@ import { TouchableOpacity as GHTouchableOpacity } from "react-native-gesture-han
 import { cssInterop } from "nativewind";
 import type { WorkoutSheet } from "@bhmt3wp/shared";
 import {
+  useActiveSessions,
+  useCloseSession,
   useCreateSheet,
   useDeleteSheet,
   useDuplicateSheet,
@@ -46,6 +50,9 @@ export default function HomeScreen() {
   const duplicateSheet = useDuplicateSheet();
   const updateSheet = useUpdateSheet();
   const reorderSheets = useReorderSheets();
+  const { data: activeSessions } = useActiveSessions();
+  const closeSession = useCloseSession();
+  const activeSession = activeSessions?.[0];
 
   const [newSheetName, setNewSheetName] = useState("");
   const [showCreate, setShowCreate] = useState(false);
@@ -262,6 +269,48 @@ export default function HomeScreen() {
           icon={SquarePen}
         />
 
+        {activeSession ? (
+          <Card className="mt-4" padding="md">
+            <View className="flex-row items-center">
+              <Flame size={16} strokeWidth={ICON_STROKE} color="#22c55e" />
+              <Text className="ml-1.5 text-emphasis text-xs font-semibold uppercase">
+                Workout in progress
+              </Text>
+            </View>
+            <Text className="text-text-primary text-base font-bold mt-1" numberOfLines={1}>
+              {activeSession.sheetName}
+            </Text>
+            <Text className="text-text-muted text-xs mt-1">
+              Started {formatStartedAt(activeSession.startedAt)}
+            </Text>
+
+            <View className="mt-3 flex-row gap-2">
+              <Button
+                label="Resume"
+                icon={Play}
+                size="sm"
+                className="flex-1"
+                onPress={() =>
+                  router.push(`/workout/${activeSession.id}?sheetId=${activeSession.sheetId}`)
+                }
+              />
+              <Button
+                label="Discard"
+                icon={Trash2}
+                size="sm"
+                variant="secondary"
+                className="flex-1"
+                loading={closeSession.isPending}
+                onPress={() =>
+                  confirmDiscard(activeSession.sheetName, () =>
+                    closeSession.mutate(activeSession.id),
+                  )
+                }
+              />
+            </View>
+          </Card>
+        ) : null}
+
         <Button
           label="Create sheet"
           icon={Plus}
@@ -381,4 +430,27 @@ function SheetAction({
       className="flex-1"
     />
   );
+}
+
+/** "12 min ago" / "2 hours ago" — sessions older than 6h are closed automatically. */
+function formatStartedAt(startedAt: string): string {
+  const minutes = Math.max(0, Math.round((Date.now() - new Date(startedAt).getTime()) / 60000));
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  return hours === 1 ? "1 hour ago" : `${hours} hours ago`;
+}
+
+function confirmDiscard(sheetName: string, onConfirm: () => void) {
+  const title = "Discard workout";
+  const message = `Stop the workout in progress on "${sheetName}"? Sets you already marked as done are kept in your history.`;
+
+  if (Platform.OS === "web") {
+    if (window.confirm(`${title}\n\n${message}`)) onConfirm();
+  } else {
+    Alert.alert(title, message, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Discard", style: "destructive", onPress: onConfirm },
+    ]);
+  }
 }

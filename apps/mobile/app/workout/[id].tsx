@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Platform,
@@ -23,6 +23,11 @@ import {
 } from "../../src/api/hooks";
 import type { ExerciseFull, ExerciseSet, SessionSetLog } from "@bhmt3wp/shared";
 import { prefs } from "../../src/lib/preferences";
+import {
+  clearSessionState,
+  loadSessionState,
+  saveSessionState,
+} from "../../src/lib/sessionCache";
 import {
   Check,
   Clock3,
@@ -61,7 +66,7 @@ export default function WorkoutScreen() {
   const router = useRouter();
 
   const { data: sheet } = useSheet(sheetId!);
-  useSession(sessionId);
+  const { data: session } = useSession(sessionId);
   const logSet = useLogSessionSet();
   const unlogSet = useUnlogSessionSet();
   const completeSession = useCompleteSession();
@@ -87,9 +92,63 @@ export default function WorkoutScreen() {
   const [restTimeLeft, setRestTimeLeft] = useState(0);
   const [restEnabled, setRestEnabled] = useState(true);
 
+  // Restore an in-progress session: the local cache holds the values the user
+  // typed but hasn't logged yet; the server logs are the source of truth for
+  // sets already marked done (and survive a reinstall or a device change).
+  const restoredRef = useRef(false);
+  const savingEnabledRef = useRef(false);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     prefs.restEnabled.get().then(setRestEnabled);
   }, []);
+
+  useEffect(() => {
+    if (restoredRef.current || !session) return;
+    restoredRef.current = true;
+
+    void (async () => {
+      const cached = await loadSessionState(sessionId);
+      const isFresh = cached && Date.now() - cached.updatedAt <= 24 * 60 * 60 * 1000;
+
+      const loggedKeys = (session.logs ?? []).map((log) => `${log.exerciseId}-${log.setNumber}`);
+      setCompletedSets(new Set([...(isFresh ? cached.completedSets : []), ...loggedKeys]));
+
+      if (isFresh) {
+        setEditValues((prev) => ({ ...prev, ...cached.editValues }));
+        setNotes((prev) => ({ ...prev, ...cached.notes }));
+      }
+
+      // Show what was actually logged for the sets already done.
+      const loggedValues: Record<string, { kg: string; reps: string }> = {};
+      for (const log of session.logs ?? []) {
+        loggedValues[`${log.exerciseId}-${log.setNumber}`] = {
+          kg: log.weightKg.toString(),
+          reps: log.reps.toString(),
+        };
+      }
+      setEditValues((prev) => ({ ...prev, ...loggedValues }));
+
+      savingEnabledRef.current = true;
+    })();
+  }, [session, sessionId]);
+
+  // Persist the in-progress state (debounced) so it survives leaving the screen.
+  useEffect(() => {
+    if (!savingEnabledRef.current) return;
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => {
+      void saveSessionState(sessionId, {
+        completedSets: [...completedSets],
+        editValues,
+        notes,
+        updatedAt: Date.now(),
+      });
+    }, 300);
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
+  }, [completedSets, editValues, notes, sessionId]);
 
   useEffect(() => {
     if (!sheet) return;
@@ -119,7 +178,9 @@ export default function WorkoutScreen() {
     for (const note of exerciseNotes) {
       notesMap[note.exerciseId] = note.notes;
     }
-    setNotes(notesMap);
+    // Server notes only fill the gaps: anything already in state comes from
+    // the cache or from the user typing, and is newer.
+    setNotes((prev) => ({ ...notesMap, ...prev }));
   }, [exerciseNotes]);
 
   useEffect(() => {
@@ -228,6 +289,7 @@ export default function WorkoutScreen() {
     confirmAction("Finish workout", "Do you want to complete this session now?", async () => {
       try {
         await completeSession.mutateAsync(sessionId);
+        await clearSessionState(sessionId);
         if (router.canDismiss()) {
           router.dismissAll();
         }

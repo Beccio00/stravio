@@ -219,6 +219,21 @@ export function useUnlogSessionSet() {
   });
 }
 
+export function useCloseSession() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.sessions.close(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["sessions"] }),
+  });
+}
+
+export function useActiveSessions() {
+  return useQuery({
+    queryKey: ["sessions", "active"],
+    queryFn: () => api.sessions.active(),
+  });
+}
+
 export function useCompletedSessions() {
   return useQuery({
     queryKey: ["sessions", "completed"],
