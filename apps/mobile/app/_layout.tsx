@@ -1,12 +1,13 @@
 import "../global.css";
 import { useEffect, useRef } from "react";
-import { View, ActivityIndicator } from "react-native";
+import { View, ActivityIndicator, Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { QueryClient, useQueryClient } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { persister } from "../src/lib/queryPersister";
 import { StatusBar } from "expo-status-bar";
+import * as NavigationBar from "expo-navigation-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { vars } from "nativewind";
 import { AuthProvider, useAuth } from "../src/contexts/AuthContext";
@@ -188,11 +189,24 @@ export default function RootLayout() {
 // Must be a child of PreferencesProvider to call usePreferences()
 function ThemeRoot() {
   const { resolvedTheme } = usePreferences();
-  const themeVars = resolvedTheme === "light" ? LIGHT_VARS : DARK_VARS;
+  const isLight = resolvedTheme === "light";
+  const themeVars = isLight ? LIGHT_VARS : DARK_VARS;
+
+  // Android system bars: match the tab bar / background of the active theme.
+  // app.json (androidStatusBar / androidNavigationBar) only sets the cold-start
+  // colors, so they must be updated at runtime when the theme changes.
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+    NavigationBar.setBackgroundColorAsync(isLight ? "#ffffff" : "#0f1728").catch(() => {});
+    NavigationBar.setButtonStyleAsync(isLight ? "dark" : "light").catch(() => {});
+  }, [isLight]);
 
   return (
     <View style={[{ flex: 1 }, themeVars]}>
-      <StatusBar style={resolvedTheme === "light" ? "dark" : "light"} />
+      <StatusBar
+        style={isLight ? "dark" : "light"}
+        backgroundColor={isLight ? "#f8fafc" : "#0b1220"}
+      />
       <ThemedStack />
     </View>
   );
