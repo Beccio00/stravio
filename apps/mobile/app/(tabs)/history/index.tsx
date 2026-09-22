@@ -9,7 +9,7 @@ import {
   Clock3,
 } from "lucide-react-native";
 import type { WorkoutSessionWithSheet } from "@bhmt3wp/shared";
-import { useCompletedSessions, useDeleteSession } from "../../../src/api/hooks";
+import { useDeleteSession, useSessionsInMonth } from "../../../src/api/hooks";
 import {
   Card,
   ICON_SIZE,
@@ -45,34 +45,28 @@ function getFirstDayOfWeek(year: number, month: number) {
 
 export default function HistoryScreen() {
   const router = useRouter();
-  const { data: sessions, isLoading } = useCompletedSessions();
   const deleteSession = useDeleteSession();
 
   const today = new Date();
   const [calYear, setCalYear] = useState(today.getFullYear());
   const [calMonth, setCalMonth] = useState(today.getMonth());
 
+  // Only the month on screen is fetched: the full history keeps growing and
+  // loading all of it would get slower every workout.
+  const { data: monthSessions = [], isLoading } = useSessionsInMonth(calYear, calMonth);
+
   const workoutDays = useMemo(() => {
     const set = new Set<string>();
-    if (sessions) {
-      for (const s of sessions) {
-        if (s.completedAt) {
-          const d = new Date(s.completedAt);
-          set.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
-        }
+    for (const s of monthSessions) {
+      if (s.completedAt) {
+        const d = new Date(s.completedAt);
+        set.add(
+          `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`,
+        );
       }
     }
     return set;
-  }, [sessions]);
-
-  const monthSessions = useMemo(() => {
-    if (!sessions) return [];
-    return sessions.filter((s) => {
-      if (!s.completedAt) return false;
-      const d = new Date(s.completedAt);
-      return d.getFullYear() === calYear && d.getMonth() === calMonth;
-    });
-  }, [sessions, calYear, calMonth]);
+  }, [monthSessions]);
 
   const daysInMonth = getDaysInMonth(calYear, calMonth);
   const firstDay = getFirstDayOfWeek(calYear, calMonth);

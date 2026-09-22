@@ -243,16 +243,23 @@ export function useActiveSessions() {
   });
 }
 
-export function useCompletedSessions() {
+export function useCompletedSessions(limit = 50) {
   return useQuery({
-    queryKey: ["sessions", "completed"],
-    queryFn: () => api.sessions.completed(),
+    queryKey: ["sessions", "completed", limit],
+    queryFn: () => api.sessions.completed(limit),
+  });
+}
+
+export function useSessionsInMonth(year: number, month: number) {
+  return useQuery({
+    queryKey: ["sessions", "completed", "month", year, month],
+    queryFn: () => api.sessions.completedInMonth(year, month),
   });
 }
 
 export function useStatsData() {
-  const { data: completed = [] } = useCompletedSessions();
-  const last10 = completed.slice(0, 10);
+  const { data: completed = [] } = useCompletedSessions(10);
+  const last10 = completed;
   const sessionQueries = useQueries({
     queries: last10.map((s) => ({
       queryKey: ["sessions", s.id],

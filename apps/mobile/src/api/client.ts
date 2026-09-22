@@ -476,11 +476,33 @@ export const api = {
       }));
     },
 
-    completed: async (): Promise<WorkoutSessionWithSheet[]> => {
+    /** Most recent completed sessions. Always pass a limit: history grows forever. */
+    completed: async (limit = 50): Promise<WorkoutSessionWithSheet[]> => {
       const { data: sessions, error } = await supabase
         .from("workout_sessions")
         .select("*, workout_sheets(name)")
         .not("completed_at", "is", null)
+        .order("completed_at", { ascending: false })
+        .limit(limit);
+      if (error) throw new Error(error.message);
+
+      return (sessions ?? []).map((s: any) => ({
+        ...mapSession(s),
+        sheetName: s.workout_sheets?.name ?? "Deleted sheet",
+      }));
+    },
+
+    /** Completed sessions of a single month — what the history calendar shows. */
+    completedInMonth: async (year: number, month: number): Promise<WorkoutSessionWithSheet[]> => {
+      const from = new Date(year, month, 1).toISOString();
+      const to = new Date(year, month + 1, 1).toISOString();
+
+      const { data: sessions, error } = await supabase
+        .from("workout_sessions")
+        .select("*, workout_sheets(name)")
+        .not("completed_at", "is", null)
+        .gte("completed_at", from)
+        .lt("completed_at", to)
         .order("completed_at", { ascending: false });
       if (error) throw new Error(error.message);
 

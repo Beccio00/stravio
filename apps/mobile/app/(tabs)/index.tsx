@@ -343,6 +343,9 @@ export default function HomeScreen() {
             }
           }}
           extraData={[editingSheetId, menuSheetId, renameDraft, updateSheet.isPending, reorderSheets.isPending, duplicateSheet.isPending]}
+          // Without flex the wrapper takes its intrinsic height and the list
+          // cannot scroll on web.
+          containerStyle={{ flex: 1 }}
           contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 140 }}
           ListEmptyComponent={
             <StateBlock
