@@ -149,116 +149,106 @@ export default function HomeScreen() {
     const isEditing = editingSheetId === item.id;
     const isMenuOpen = menuSheetId === item.id;
 
+    // The "open sheet" touchable wraps only the title block: the drag handle,
+    // the options button and the inline menu are siblings, so their presses
+    // never reach it (stopPropagation doesn't stop gesture-handler touchables).
     return (
       <ScaleDecorator>
-        <GHTouchableOpacity
-          className="w-full"
-          onPress={() => router.push(`/sheet/${item.id}`)}
-          onLongPress={() => toggleSheetMenu(item)}
-          delayLongPress={350}
-          disabled={isEditing}
-          activeOpacity={0.75}
-        >
-          <Card className={`w-full mb-3 ${isActive ? "opacity-90" : ""}`}>
-            <View className="flex-row items-center">
-              {!isEditing ? (
+        <Card className={`w-full mb-3 ${isActive ? "opacity-90" : ""}`}>
+          <View className="flex-row items-center">
+            {!isEditing ? (
+              <GHTouchableOpacity
+                onLongPress={drag}
+                delayLongPress={180}
+                disabled={reorderSheets.isPending}
+                className="mr-1 h-9 w-8 items-center justify-center"
+                accessibilityLabel="Hold and drag to reorder sheet"
+                accessibilityRole="button"
+              >
+                <GripVertical size={ICON_SIZE} strokeWidth={ICON_STROKE} color="#7c8aa5" />
+              </GHTouchableOpacity>
+            ) : null}
+
+            {isEditing ? (
+              <View className="flex-1 flex-row items-center">
+                <Input
+                  value={renameDraft}
+                  onChangeText={setRenameDraft}
+                  placeholder="Sheet name"
+                  editable={!updateSheet.isPending}
+                  onSubmitEditing={applyRename}
+                  containerClassName="flex-1"
+                  inputClassName="text-lg font-semibold"
+                  returnKeyType="done"
+                />
+                <TouchableOpacity
+                  onPress={applyRename}
+                  disabled={updateSheet.isPending}
+                  className="ml-2 h-10 w-10 items-center justify-center rounded-xl bg-action-secondary border border-border"
+                  accessibilityLabel="Save sheet name"
+                >
+                  <Check size={ICON_SIZE} strokeWidth={ICON_STROKE} color="#22c55e" />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <>
                 <GHTouchableOpacity
-                  onLongPress={drag}
-                  delayLongPress={180}
-                  disabled={reorderSheets.isPending}
-                  className="mr-1 h-9 w-8 items-center justify-center"
-                  accessibilityLabel="Hold and drag to reorder sheet"
+                  className="flex-1 min-w-0 py-1"
+                  onPress={() => router.push(`/sheet/${item.id}`)}
+                  onLongPress={() => toggleSheetMenu(item)}
+                  delayLongPress={350}
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Open ${item.name}`}
+                >
+                  <Text className="text-text-primary text-lg font-bold" numberOfLines={1}>
+                    {item.name}
+                  </Text>
+                  <Text className="text-text-muted text-xs mt-1">Tap to open workout plan</Text>
+                </GHTouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => toggleSheetMenu(item)}
+                  className={`ml-2 mr-2 h-9 w-9 items-center justify-center rounded-xl border ${
+                    isMenuOpen ? "bg-action-primary border-action-primary" : "bg-action-secondary border-border"
+                  }`}
+                  accessibilityLabel="Sheet options"
                   accessibilityRole="button"
                 >
-                  <GripVertical size={ICON_SIZE} strokeWidth={ICON_STROKE} color="#7c8aa5" />
-                </GHTouchableOpacity>
-              ) : null}
-
-              {isEditing ? (
-                <View className="flex-1 flex-row items-center">
-                  <Input
-                    value={renameDraft}
-                    onChangeText={setRenameDraft}
-                    placeholder="Sheet name"
-                    editable={!updateSheet.isPending}
-                    onSubmitEditing={applyRename}
-                    containerClassName="flex-1"
-                    inputClassName="text-lg font-semibold"
-                    returnKeyType="done"
+                  <MoreHorizontal
+                    size={ICON_SIZE}
+                    strokeWidth={ICON_STROKE}
+                    color={isMenuOpen ? "#ffffff" : "#c0c9d8"}
                   />
-                  <TouchableOpacity
-                    onPress={applyRename}
-                    disabled={updateSheet.isPending}
-                    className="ml-2 h-10 w-10 items-center justify-center rounded-xl bg-action-secondary border border-border"
-                    accessibilityLabel="Save sheet name"
-                  >
-                    <Check size={ICON_SIZE} strokeWidth={ICON_STROKE} color="#22c55e" />
-                  </TouchableOpacity>
+                </TouchableOpacity>
+                <View className="w-4 items-center">
+                  <ChevronRight size={ICON_SIZE} strokeWidth={ICON_STROKE} color="#7c8aa5" />
                 </View>
-              ) : (
-                <View className="relative flex-1 min-w-0">
-                  <View className="min-w-0 pr-20">
-                    <Text className="text-text-primary text-lg font-bold" numberOfLines={1}>
-                      {item.name}
-                    </Text>
-                    <Text className="text-text-muted text-xs mt-1">Tap to open workout plan</Text>
-                  </View>
+              </>
+            )}
+          </View>
 
-                  <View
-                    className="absolute inset-y-0 right-0 w-16 flex-row items-center justify-end"
-                    pointerEvents="box-none"
-                  >
-                    <TouchableOpacity
-                      onPress={(event) => {
-                        event.stopPropagation();
-                        toggleSheetMenu(item);
-                      }}
-                      className={`mr-2 h-9 w-9 items-center justify-center rounded-xl border ${
-                        isMenuOpen ? "bg-action-primary border-action-primary" : "bg-action-secondary border-border"
-                      }`}
-                      accessibilityLabel="Sheet options"
-                      accessibilityRole="button"
-                    >
-                      <MoreHorizontal
-                        size={ICON_SIZE}
-                        strokeWidth={ICON_STROKE}
-                        color={isMenuOpen ? "#ffffff" : "#c0c9d8"}
-                      />
-                    </TouchableOpacity>
-                    <View className="w-4 items-center">
-                      <ChevronRight size={ICON_SIZE} strokeWidth={ICON_STROKE} color="#7c8aa5" />
-                    </View>
-                  </View>
-                </View>
-              )}
+          {isMenuOpen && !isEditing ? (
+            <View className="mt-3 flex-row gap-2 border-t border-border pt-3">
+              <SheetAction label="Rename" icon={PencilLine} onPress={() => beginRename(item)} />
+              <SheetAction
+                label="Duplicate"
+                icon={Copy}
+                onPress={() => handleDuplicate(item)}
+                loading={duplicateSheet.isPending}
+              />
+              <SheetAction
+                label="Delete"
+                icon={Trash2}
+                tone="danger"
+                onPress={() => {
+                  setMenuSheetId(null);
+                  handleDelete(item.id, item.name);
+                }}
+              />
             </View>
-
-            {isMenuOpen && !isEditing ? (
-              <View className="mt-3 flex-row gap-2 border-t border-border pt-3">
-                <SheetAction
-                  label="Rename"
-                  icon={PencilLine}
-                  onPress={() => beginRename(item)}
-                />
-                <SheetAction
-                  label="Duplicate"
-                  icon={Copy}
-                  onPress={() => handleDuplicate(item)}
-                  loading={duplicateSheet.isPending}
-                />
-                <SheetAction
-                  label="Delete"
-                  icon={Trash2}
-                  tone="danger"
-                  onPress={() => {
-                    setMenuSheetId(null);
-                    handleDelete(item.id, item.name);
-                  }}
-                />
-              </View>
-            ) : null}
-          </Card>
-        </GHTouchableOpacity>
+          ) : null}
+        </Card>
       </ScaleDecorator>
     );
   };
@@ -386,10 +376,7 @@ function SheetAction({
       icon={icon}
       size="sm"
       variant={tone === "danger" ? "danger" : "secondary"}
-      onPress={(event) => {
-        event.stopPropagation();
-        onPress();
-      }}
+      onPress={onPress}
       loading={loading}
       className="flex-1"
     />
