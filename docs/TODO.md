@@ -3,10 +3,6 @@
 ## CURRENT
 
 - [ ] **PowerSync integration** – Offline-first sync between local cache and Supabase Postgres. This has to allow the mobile app to work offline and sync when back online, and should be much more quick by loading data from the local cache. Use SQLite if it works well with both Expo, Vercel and Android, otherwise consider alternatives
-- [ ] **Fix Notifications on Android** – Debug and resolve issues with Expo Notifications not working on Android devices, ensuring users receive workout reminders as intended and the doesn't glitch showing the white screen (compatibility problem).
-- [ ] **Store current session in local cache** – This allows users to resume an active workout session even if they go on other tabs, close the app, or lose connectivity, improving the user experience during workouts.
-- [ ] **Fix notes** - The notes are not working properly, they are not saved and not shown in the sessions history. This needs to be fixed to ensure users can take notes on their exercises and review them later.
-- [ ] **Sheet templates** – Clone/duplicate an existing sheet.
 - [ ] **Supabase session too large for SecureStore** – The persisted auth session exceeds SecureStore's 2048-byte limit on Android (warning today, error in a future SDK → persistent login at risk in the APK). Move the Supabase auth storage to AsyncStorage (or the LargeSecureStore pattern from the Supabase docs).
 - [ ] **EAS Update (OTA) setup** – Install `expo-updates`, set `runtimeVersion` (`appVersion` policy) and `updates.url` in `app.json`, rebuild the APK, then enable the `update` job in `.github/workflows/eas-production.yml`. Also lets testers open a preview from expo.dev → Updates in Expo Go.
 - [ ] **New Architecture** – Expo Go always runs the New Architecture while `app.json` has `newArchEnabled: false` (APK = old arch). This is why Expo Go and the APK can behave differently; always smoke-test on the APK. Evaluate switching to `newArchEnabled: true` once `react-native-draggable-flatlist`/reanimated warnings are sorted out.
@@ -32,6 +28,13 @@
 
 
 ## Done
+
+- [x] **Real Android notifications** – `expo-notifications` with a daily reminder and a monochrome status-bar icon (v1.2.0).
+- [x] **Resume an in-progress workout** – Cached locally and restored from the server, with Resume/Discard entry points and auto-close after 6h (v1.2.0).
+- [x] **Session notes** – Shown in the history detail and synced back to the sheet template on finish (v1.2.0).
+- [x] **Sheet templates** – Duplicate a sheet with its exercises, sets and notes (v1.2.0).
+- [x] **Import / export sheets** – JSON, CSV and PDF (v1.2.0).
+- [x] **History scalability** – Only the month on screen is fetched (v1.2.0).
 
 - [x] **UI polish on sheet** – Rename button with pencil icon (restored from main's sheet screen).
 - [x] **Reset query cache on login/logout** – Persisted React Query cache no longer shows stale/other-user data after a fresh login.
