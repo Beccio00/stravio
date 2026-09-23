@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Alert, Platform, ScrollView, Switch, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import Constants from "expo-constants";
 import type { LucideIcon } from "lucide-react-native";
 import {
   BellRing,
@@ -399,6 +400,11 @@ export default function SettingsScreen() {
             <Text className="ml-2 text-danger font-semibold">Sign out</Text>
           </TouchableOpacity>
         </Card>
+
+        {/* Tells at a glance which build is running, on web and on device. */}
+        <Text className="text-text-muted text-xs text-center mt-6">
+          Stravio v{Constants.expoConfig?.version ?? "—"}
+        </Text>
       </ScrollView>
     </SafeAreaView>
   );
