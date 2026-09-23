@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient, useQueries } from "@tanstack/react-query";
 import type { SessionDetailFull } from "@bhmt3wp/shared";
+import type { ImportedSheet } from "../lib/sheetsIO";
 import { api } from "./client";
 import type {
   CreateWorkoutSheetInput,
@@ -64,6 +65,22 @@ export function useReorderSheets() {
   return useMutation({
     mutationFn: (orderedIds: string[]) => api.sheets.reorder(orderedIds),
     onSettled: () => qc.invalidateQueries({ queryKey: ["sheets"] }),
+  });
+}
+
+export function useImportSheets() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (sheets: ImportedSheet[]) => api.sheets.import(sheets),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["sheets"] }),
+  });
+}
+
+export function useDuplicateSheet() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.sheets.duplicate(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["sheets"] }),
   });
 }
 
@@ -211,16 +228,38 @@ export function useUnlogSessionSet() {
   });
 }
 
-export function useCompletedSessions() {
+export function useCloseSession() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.sessions.close(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["sessions"] }),
+  });
+}
+
+export function useActiveSessions() {
   return useQuery({
-    queryKey: ["sessions", "completed"],
-    queryFn: () => api.sessions.completed(),
+    queryKey: ["sessions", "active"],
+    queryFn: () => api.sessions.active(),
+  });
+}
+
+export function useCompletedSessions(limit = 50) {
+  return useQuery({
+    queryKey: ["sessions", "completed", limit],
+    queryFn: () => api.sessions.completed(limit),
+  });
+}
+
+export function useSessionsInMonth(year: number, month: number) {
+  return useQuery({
+    queryKey: ["sessions", "completed", "month", year, month],
+    queryFn: () => api.sessions.completedInMonth(year, month),
   });
 }
 
 export function useStatsData() {
-  const { data: completed = [] } = useCompletedSessions();
-  const last10 = completed.slice(0, 10);
+  const { data: completed = [] } = useCompletedSessions(10);
+  const last10 = completed;
   const sessionQueries = useQueries({
     queries: last10.map((s) => ({
       queryKey: ["sessions", s.id],

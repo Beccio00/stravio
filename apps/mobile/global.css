@@ -1,3 +1,31 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Dark theme (default) */
+:root {
+  --color-background: #0b1220;
+  --color-surface: #121b2e;
+  --color-surface-light: #1a2740;
+  --color-surface-muted: #0f1728;
+  --color-text-primary: #f8fafc;
+  --color-text-secondary: #c0c9d8;
+  --color-text-muted: #7c8aa5;
+  --color-border: #24324a;
+  --color-action-secondary: #1f2b44;
+  --color-action-secondary-press: #2a3b5f;
+}
+
+/* Light theme */
+.light {
+  --color-background: #f8fafc;
+  --color-surface: #ffffff;
+  --color-surface-light: #f1f5f9;
+  --color-surface-muted: #e2e8f0;
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #334155;
+  --color-text-muted: #64748b;
+  --color-border: #cbd5e1;
+  --color-action-secondary: #e2e8f0;
+  --color-action-secondary-press: #cbd5e1;
+}

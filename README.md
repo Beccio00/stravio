@@ -1,6 +1,13 @@
-# Stravio
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="apps/mobile/assets/stravio-lockup-scuro.png" />
+    <img src="apps/mobile/assets/stravio-lockup-chiaro.png" width="420" alt="Stravio" />
+  </picture>
+</p>
 
-Stravio is an open source workout sheet manager. Create workout sheets, log sessions in real-time, and track progress on Android, iOS, and Web.
+<p align="center">
+  Open source workout sheet manager — build your sheets, log every set in real time, and track progress on Android, iOS and Web.
+</p>
 
 <p align="center">
   <img src="docs/screenshots/login.png" width="200" alt="Login" />
@@ -51,11 +58,12 @@ This v1 intentionally keeps the product model simple:
 
 ---
 
-## APK
-the apk is aviable in this link: https://expo.dev/accounts/beccio00/projects/stravio/builds/04e946f6-f2de-4e1e-a55e-8dc337c0ec70
+## Download
 
-## Web App 
-Web app is deployed on Vercel: https://stravio-project.vercel.app/
+- **Android (v1.2.0)** — [install the APK](https://expo.dev/accounts/stravio/projects/stravio/builds/58c04459-598c-42ae-b775-e641330cd8ac) from the Expo build page (tap *Install* on the phone, or scan the QR code).
+- **Web** — <https://stravio-project.vercel.app/>
+
+Every build is listed on the [Expo dashboard](https://expo.dev/accounts/stravio/projects/stravio/builds).
 
 ## Getting Started
 

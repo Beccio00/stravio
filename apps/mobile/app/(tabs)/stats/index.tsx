@@ -5,13 +5,23 @@ import { BarChart3, LineChart, Trophy } from "lucide-react-native";
 import { useStatsData } from "../../../src/api/hooks";
 import type { SessionDetailFull } from "@bhmt3wp/shared";
 import { Card, ICON_STROKE, ScreenHeader, StateBlock } from "../../../src/components/ui";
+import { usePreferences } from "../../../src/contexts/PreferencesContext";
 
 const PRIMARY = "#3b82f6";
 const ACCENT = "#22c55e";
-const TEXT_SECONDARY = "#c0c9d8";
-const TEXT_MUTED = "#7c8aa5";
-const GRID = "#24324a";
-const BAR_BG = "#1f2b44";
+
+interface ChartColors {
+  textSecondary: string;
+  grid: string;
+  barBg: string;
+}
+
+function useChartColors(): ChartColors {
+  const { resolvedTheme } = usePreferences();
+  return resolvedTheme === "light"
+    ? { textSecondary: "#334155", grid: "#cbd5e1", barBg: "#e2e8f0" }
+    : { textSecondary: "#c0c9d8", grid: "#24324a", barBg: "#1f2b44" };
+}
 
 function sessionVolume(session: SessionDetailFull): number {
   return session.exercises.reduce((total, group) => {
@@ -36,6 +46,7 @@ interface VolumeChartProps {
 }
 
 function VolumeChart({ sessions, width }: VolumeChartProps) {
+  const { textSecondary: TEXT_SECONDARY, grid: GRID } = useChartColors();
   const PADDING = { top: 20, right: 16, bottom: 36, left: 52 };
   const height = 210;
   const chartW = width - PADDING.left - PADDING.right;
@@ -131,6 +142,7 @@ interface BarChartProps {
 }
 
 function MaxWeightChart({ sessions, width }: BarChartProps) {
+  const { textSecondary: TEXT_SECONDARY, barBg: BAR_BG } = useChartColors();
   const maxWeightMap = buildMaxWeightMap(sessions);
   const sorted = [...maxWeightMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
 

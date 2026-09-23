@@ -20,8 +20,11 @@ import {
   useDeleteSet,
   useCreateSession,
   useReorderExercises,
+  useActiveSessions,
+  useCloseSession,
 } from "../../src/api/hooks";
 import type { ExerciseFull, ExerciseSet } from "@bhmt3wp/shared";
+import { prefs } from "../../src/lib/preferences";
 import DraggableFlatList, { ScaleDecorator } from "react-native-draggable-flatlist";
 import type { RenderItemParams } from "react-native-draggable-flatlist";
 import { TouchableOpacity as GHTouchableOpacity } from "react-native-gesture-handler";
@@ -63,16 +66,30 @@ export default function SheetDetailScreen() {
   const createSession = useCreateSession();
   const updateSheet = useUpdateSheet();
   const reorderExercises = useReorderExercises(sheetId);
+  const { data: activeSessions } = useActiveSessions();
+  const closeSession = useCloseSession();
+  // Only one workout can be in progress at a time, on any sheet.
+  const activeSession = activeSessions?.[0];
+  const isActiveHere = activeSession?.sheetId === sheetId;
 
   const [newExerciseName, setNewExerciseName] = useState("");
   const [showAddExercise, setShowAddExercise] = useState(false);
   const [isEditingSheetName, setIsEditingSheetName] = useState(false);
   const [sheetNameDraft, setSheetNameDraft] = useState("");
   const [exerciseList, setExerciseList] = useState<ExerciseFull[]>([]);
+  const [restEnabled, setRestEnabled] = useState(true);
+  const [restDefaultSec, setRestDefaultSec] = useState(60);
 
   useEffect(() => {
     if (sheet) setExerciseList(sheet.exercises);
   }, [sheet]);
+
+  useEffect(() => {
+    Promise.all([prefs.restEnabled.get(), prefs.restDefaultSec.get()]).then(([re, rd]) => {
+      setRestEnabled(re);
+      setRestDefaultSec(rd);
+    });
+  }, []);
 
   const beginEditSheetName = () => {
     setSheetNameDraft(sheet?.name ?? "");
@@ -148,11 +165,11 @@ export default function SheetDetailScreen() {
       setNumber: nextSetNumber,
       reps: lastSet?.reps ?? 10,
       weightKg: lastSet?.weightKg ?? 0,
-      restTimeSec: lastSet?.restTimeSec ?? 60,
+      restTimeSec: restEnabled ? (lastSet?.restTimeSec ?? restDefaultSec) : 0,
     });
   };
 
-  const handleStartWorkout = () => {
+  const startSession = () => {
     createSession.mutate(
       { sheetId },
       {
@@ -163,6 +180,35 @@ export default function SheetDetailScreen() {
     );
   };
 
+  /** Closes the session in progress (kept in history if it has logged sets), then starts a new one. */
+  const confirmStartFresh = () => {
+    if (!activeSession) return startSession();
+
+    const title = "Start a new workout";
+    const message = isActiveHere
+      ? "The workout in progress on this sheet will be closed. Sets you already marked as done stay in your history."
+      : `You already have a workout in progress on "${activeSession.sheetName}". Starting this one will close it. Sets you already marked as done stay in your history.`;
+    const run = () => closeSession.mutate(activeSession.id, { onSuccess: startSession });
+
+    if (Platform.OS === "web") {
+      if (window.confirm(`${title}\n\n${message}`)) run();
+    } else {
+      Alert.alert(title, message, [
+        { text: "Cancel", style: "cancel" },
+        { text: "Start new", style: "destructive", onPress: run },
+      ]);
+    }
+  };
+
+  const handleStartWorkout = () => {
+    // Same sheet → resume it; another sheet (or none) → start after confirming.
+    if (isActiveHere && activeSession) {
+      router.push(`/workout/${activeSession.id}?sheetId=${sheetId}`);
+      return;
+    }
+    confirmStartFresh();
+  };
+
   const renderExercise = ({ item: exercise, drag, isActive }: RenderItemParams<ExerciseFull>) => (
     <ScaleDecorator>
       <ExerciseCard
@@ -170,6 +216,7 @@ export default function SheetDetailScreen() {
         isActive={isActive}
         drag={drag}
         isPendingReorder={reorderExercises.isPending}
+        showRest={restEnabled}
         onDelete={() => handleDeleteExercise(exercise.id, exercise.name)}
         onUpdateExercise={(data) => updateExercise.mutate({ id: exercise.id, ...data })}
         onAddSet={() => handleAddSet(exercise.id, exercise.sets)}
@@ -215,13 +262,26 @@ export default function SheetDetailScreen() {
               title={sheet.name}
               subtitle="Plan your sets, then start the session when ready."
               rightAction={
-                <Button
-                  label="Start"
-                  icon={Play}
-                  size="sm"
-                  onPress={handleStartWorkout}
-                  loading={createSession.isPending}
-                />
+                <View className="flex-row items-center">
+                  {isActiveHere ? (
+                    <Button
+                      label="New"
+                      icon={Plus}
+                      size="sm"
+                      variant="secondary"
+                      onPress={confirmStartFresh}
+                      loading={closeSession.isPending}
+                      className="mr-2"
+                    />
+                  ) : null}
+                  <Button
+                    label={isActiveHere ? "Resume" : "Start"}
+                    icon={Play}
+                    size="sm"
+                    onPress={handleStartWorkout}
+                    loading={createSession.isPending || closeSession.isPending}
+                  />
+                </View>
               }
             />
 
@@ -316,6 +376,9 @@ export default function SheetDetailScreen() {
             />
           </View>
         }
+        // Without flex the wrapper takes its intrinsic height and the list
+        // cannot scroll on web.
+        containerStyle={{ flex: 1 }}
         contentContainerStyle={{ paddingBottom: 120 }}
       />
     </SafeAreaView>
@@ -327,6 +390,7 @@ function ExerciseCard({
   isActive,
   drag,
   isPendingReorder,
+  showRest,
   onDelete,
   onUpdateExercise,
   onAddSet,
@@ -337,6 +401,7 @@ function ExerciseCard({
   isActive: boolean;
   drag: () => void;
   isPendingReorder: boolean;
+  showRest: boolean;
   onDelete: () => void;
   onUpdateExercise: (data: { notes?: string }) => void;
   onAddSet: () => void;
@@ -411,7 +476,9 @@ function ExerciseCard({
             <Text className="w-10 text-text-muted text-xs font-semibold">SET</Text>
             <Text className="flex-1 text-center text-text-muted text-xs font-semibold">KG</Text>
             <Text className="flex-1 text-center text-text-muted text-xs font-semibold">REPS</Text>
-            <Text className="flex-1 text-center text-text-muted text-xs font-semibold">REST</Text>
+            {showRest ? (
+              <Text className="flex-1 text-center text-text-muted text-xs font-semibold">REST</Text>
+            ) : null}
             <View className="w-8" />
           </View>
         ) : null}
@@ -420,6 +487,7 @@ function ExerciseCard({
           <SetRow
             key={set.id}
             set={set}
+            showRest={showRest}
             onUpdate={(data) => onUpdateSet(set.id, data)}
             onDelete={() => onDeleteSet(set.id)}
           />
@@ -440,10 +508,12 @@ function ExerciseCard({
 
 function SetRow({
   set,
+  showRest,
   onUpdate,
   onDelete,
 }: {
   set: ExerciseSet;
+  showRest: boolean;
   onUpdate: (data: { reps?: number; weightKg?: number; restTimeSec?: number }) => void;
   onDelete: () => void;
 }) {
@@ -513,12 +583,14 @@ function SetRow({
           onChangeText={setReps}
           keyboardType="numeric"
         />
-        <TextInput
-          className="mx-1 flex-1 rounded-lg border border-border bg-surface-light px-2 py-1 text-center text-text-primary text-sm"
-          value={rest}
-          onChangeText={setRest}
-          keyboardType="numeric"
-        />
+        {showRest ? (
+          <TextInput
+            className="mx-1 flex-1 rounded-lg border border-border bg-surface-light px-2 py-1 text-center text-text-primary text-sm"
+            value={rest}
+            onChangeText={setRest}
+            keyboardType="numeric"
+          />
+        ) : null}
 
         <TouchableOpacity onPress={handleSave} className="w-8 items-center" accessibilityLabel="Save set values">
           <Check size={16} strokeWidth={ICON_STROKE} color="#22c55e" />
@@ -543,7 +615,9 @@ function SetRow({
         <Text className="w-10 text-text-secondary text-sm font-semibold">{set.setNumber}</Text>
         <Text className="flex-1 text-center text-text-primary text-sm">{set.weightKg}</Text>
         <Text className="flex-1 text-center text-text-primary text-sm">{set.reps}</Text>
-        <Text className="flex-1 text-center text-text-muted text-sm">{set.restTimeSec}s</Text>
+        {showRest ? (
+          <Text className="flex-1 text-center text-text-muted text-sm">{set.restTimeSec}s</Text>
+        ) : null}
       </TouchableOpacity>
 
       <TouchableOpacity

@@ -7,6 +7,7 @@
  */
 
 import { supabase } from "../lib/supabase";
+import type { ImportedSheet } from "../lib/sheetsIO";
 import type {
   WorkoutSheet,
   WorkoutSheetFull,
@@ -109,6 +110,21 @@ function mapNote(row: any): SessionExerciseNote {
   };
 }
 
+/** order_index that puts a new sheet at the top of the user's list (current minimum − 1). */
+async function topOrderIndex(userId: string): Promise<number> {
+  const { data: minRows, error } = await supabase
+    .from("workout_sheets")
+    .select("order_index")
+    .eq("user_id", userId)
+    .order("order_index", { ascending: true })
+    .limit(1);
+  if (error) throw new Error(error.message);
+  return !minRows?.length ? 0 : ((minRows[0] as { order_index: number }).order_index ?? 0) - 1;
+}
+
+/** An in-progress session untouched for this long is closed automatically. */
+export const STALE_SESSION_HOURS = 6;
+
 // ---------------------------------------------------------------------------
 // API implementation
 // ---------------------------------------------------------------------------
@@ -158,15 +174,7 @@ export const api = {
 
     create: async (data: CreateWorkoutSheetInput): Promise<WorkoutSheet> => {
       const userId = await getUserId();
-      const { data: minRows, error: minErr } = await supabase
-        .from("workout_sheets")
-        .select("order_index")
-        .eq("user_id", userId)
-        .order("order_index", { ascending: true })
-        .limit(1);
-      if (minErr) throw new Error(minErr.message);
-      const nextOrder =
-        !minRows?.length ? 0 : ((minRows[0] as { order_index: number }).order_index ?? 0) - 1;
+      const nextOrder = await topOrderIndex(userId);
 
       const { data: result, error } = await supabase
         .from("workout_sheets")
@@ -201,6 +209,105 @@ export const api = {
     delete: async (id: string): Promise<void> => {
       const { error } = await supabase.from("workout_sheets").delete().eq("id", id);
       if (error) throw new Error(error.message);
+    },
+
+    duplicate: async (sourceId: string): Promise<WorkoutSheet> => {
+      const userId = await getUserId();
+      const source = await api.sheets.get(sourceId);
+      const nextOrder = await topOrderIndex(userId);
+
+      const { data: newSheet, error: newSheetErr } = await supabase
+        .from("workout_sheets")
+        .insert({
+          user_id: userId,
+          name: `${source.name} (copy)`,
+          description: source.description ?? null,
+          order_index: nextOrder,
+        })
+        .select()
+        .single();
+      if (newSheetErr) throw new Error(newSheetErr.message);
+
+      await Promise.all(
+        source.exercises.map(async (ex) => {
+          const { data: newEx, error: exErr } = await supabase
+            .from("exercises")
+            .insert({
+              sheet_id: newSheet.id,
+              name: ex.name,
+              order_index: ex.orderIndex,
+              notes: ex.notes ?? null,
+            })
+            .select()
+            .single();
+          if (exErr) throw new Error(exErr.message);
+
+          if (ex.sets.length > 0) {
+            const setsToInsert = ex.sets.map((s) => ({
+              exercise_id: newEx.id,
+              set_number: s.setNumber,
+              reps: s.reps,
+              weight_kg: s.weightKg,
+              rest_time_sec: s.restTimeSec,
+            }));
+            const { error: setsErr } = await supabase.from("exercise_sets").insert(setsToInsert);
+            if (setsErr) throw new Error(setsErr.message);
+          }
+        }),
+      );
+
+      return mapSheet(newSheet);
+    },
+
+    /** Adds sheets (with exercises and sets) from an imported file; existing sheets are untouched. */
+    import: async (sheets: ImportedSheet[]): Promise<void> => {
+      const userId = await getUserId();
+      // Imported sheets land above the existing ones, keeping their own order.
+      const baseOrder = (await topOrderIndex(userId)) - sheets.length + 1;
+
+      for (let si = 0; si < sheets.length; si++) {
+        const s = sheets[si];
+
+        const { data: sheetRow, error: sheetErr } = await supabase
+          .from("workout_sheets")
+          .insert({
+            user_id: userId,
+            name: s.name,
+            description: s.description ?? null,
+            order_index: baseOrder + si,
+          })
+          .select()
+          .single();
+        if (sheetErr) throw new Error(sheetErr.message);
+
+        for (let ei = 0; ei < s.exercises.length; ei++) {
+          const e = s.exercises[ei];
+          const { data: exRow, error: exErr } = await supabase
+            .from("exercises")
+            .insert({
+              sheet_id: sheetRow.id,
+              name: e.name,
+              notes: e.notes ?? null,
+              order_index: ei,
+            })
+            .select()
+            .single();
+          if (exErr) throw new Error(exErr.message);
+
+          if (e.sets.length > 0) {
+            const { error: setsErr } = await supabase.from("exercise_sets").insert(
+              e.sets.map((set) => ({
+                exercise_id: exRow.id,
+                set_number: set.setNumber,
+                reps: set.reps,
+                weight_kg: set.weightKg,
+                rest_time_sec: set.restTimeSec,
+              })),
+            );
+            if (setsErr) throw new Error(setsErr.message);
+          }
+        }
+      }
     },
 
     /** Persists list order: first id = top (order_index 0). */
@@ -335,11 +442,67 @@ export const api = {
       return (data ?? []).map(mapSession);
     },
 
-    completed: async (): Promise<WorkoutSessionWithSheet[]> => {
+    /**
+     * Sessions still in progress (no completed_at), newest first.
+     *
+     * A session is only ever finished from the workout screen, so an app kill
+     * or an abandoned workout leaves it open forever. Anything older than
+     * STALE_SESSION_HOURS is closed first: completed if sets were logged,
+     * deleted if it is empty (an empty session would be noise in the history).
+     */
+    active: async (): Promise<WorkoutSessionWithSheet[]> => {
+      const { data, error } = await supabase
+        .from("workout_sessions")
+        .select("*, workout_sheets(name)")
+        .is("completed_at", null)
+        .order("started_at", { ascending: false });
+      if (error) throw new Error(error.message);
+
+      const rows = data ?? [];
+      const staleBefore = Date.now() - STALE_SESSION_HOURS * 60 * 60 * 1000;
+      const fresh: any[] = [];
+
+      for (const row of rows) {
+        if (new Date(row.started_at).getTime() >= staleBefore) {
+          fresh.push(row);
+          continue;
+        }
+        await api.sessions.close(row.id);
+      }
+
+      return fresh.map((s: any) => ({
+        ...mapSession(s),
+        sheetName: s.workout_sheets?.name ?? "Deleted sheet",
+      }));
+    },
+
+    /** Most recent completed sessions. Always pass a limit: history grows forever. */
+    completed: async (limit = 50): Promise<WorkoutSessionWithSheet[]> => {
       const { data: sessions, error } = await supabase
         .from("workout_sessions")
         .select("*, workout_sheets(name)")
         .not("completed_at", "is", null)
+        .order("completed_at", { ascending: false })
+        .limit(limit);
+      if (error) throw new Error(error.message);
+
+      return (sessions ?? []).map((s: any) => ({
+        ...mapSession(s),
+        sheetName: s.workout_sheets?.name ?? "Deleted sheet",
+      }));
+    },
+
+    /** Completed sessions of a single month — what the history calendar shows. */
+    completedInMonth: async (year: number, month: number): Promise<WorkoutSessionWithSheet[]> => {
+      const from = new Date(year, month, 1).toISOString();
+      const to = new Date(year, month + 1, 1).toISOString();
+
+      const { data: sessions, error } = await supabase
+        .from("workout_sessions")
+        .select("*, workout_sheets(name)")
+        .not("completed_at", "is", null)
+        .gte("completed_at", from)
+        .lt("completed_at", to)
         .order("completed_at", { ascending: false });
       if (error) throw new Error(error.message);
 
@@ -357,13 +520,20 @@ export const api = {
         .single();
       if (error) throw new Error(error.message);
 
-      const { data: logRows } = await supabase
-        .from("session_set_logs")
-        .select("*")
-        .eq("session_id", id)
-        .order("set_number");
+      const [{ data: logRows }, { data: noteRows }] = await Promise.all([
+        supabase
+          .from("session_set_logs")
+          .select("*")
+          .eq("session_id", id)
+          .order("set_number"),
+        supabase
+          .from("session_exercise_notes")
+          .select("*")
+          .eq("session_id", id),
+      ]);
 
       const logs = (logRows ?? []).map(mapLog);
+      const exerciseNotes = (noteRows ?? []).map(mapNote);
 
       // Group logs by exercise
       const exerciseIds = [...new Set(logs.map((l) => l.exerciseId))];
@@ -389,6 +559,7 @@ export const api = {
         sheetName: session.workout_sheets?.name ?? "Deleted sheet",
         logs,
         exercises,
+        exerciseNotes,
       };
     },
 
@@ -424,6 +595,19 @@ export const api = {
       }
 
       return mapSession(result);
+    },
+
+    /** Ends an abandoned session: completed if it has logged sets, deleted if empty. */
+    close: async (id: string): Promise<void> => {
+      const { count } = await supabase
+        .from("session_set_logs")
+        .select("id", { count: "exact", head: true })
+        .eq("session_id", id);
+      if (count && count > 0) {
+        await api.sessions.complete(id);
+      } else {
+        await api.sessions.delete(id);
+      }
     },
 
     complete: async (id: string): Promise<WorkoutSession> => {

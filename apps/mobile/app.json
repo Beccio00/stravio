@@ -2,14 +2,16 @@
   "expo": {
     "name": "Stravio",
     "slug": "stravio",
-    "version": "1.0.3",
+    "version": "1.2.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "stravio",
     "userInterfaceStyle": "dark",
     "newArchEnabled": false,
     "splash": {
-      "backgroundColor": "#1a1a2e"
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#121d39"
     },
     "ios": {
       "supportsTablet": true,
@@ -17,9 +19,18 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#1a1a2e"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0881f2"
       },
       "package": "com.bhmt3wp.stravio"
+    },
+    "androidStatusBar": {
+      "barStyle": "light-content",
+      "backgroundColor": "#0b1220"
+    },
+    "androidNavigationBar": {
+      "barStyle": "light-content",
+      "backgroundColor": "#0f1728"
     },
     "web": {
       "bundler": "metro",
@@ -34,7 +45,15 @@
             "kotlinVersion": "1.9.25"
           }
         }
-      ]
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#3b82f6"
+        }
+      ],
+      "expo-document-picker"
     ],
     "extra": {
       "router": {

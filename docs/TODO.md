@@ -2,11 +2,12 @@
 
 ## CURRENT
 
-- [ ] **Fix white line** - Remove white line appearing at the bottom of the screen on Android devices.
-- [ ] **Fix height of the text** 
-- [ ] **Scroll horizontally** - Scroll horizontally to switch between tabs
-- [ ] **Enhance settings** - Add options for rest timer, theme selection, and account management.
-- [ ] **PowerSync integration** – Offline-first sync between local SQLite cache and Supabase Postgres. This will allow the mobile app to work offline and sync when back online.
+- [ ] **PowerSync integration** – Offline-first sync between local cache and Supabase Postgres. This has to allow the mobile app to work offline and sync when back online, and should be much more quick by loading data from the local cache. Use SQLite if it works well with both Expo, Vercel and Android, otherwise consider alternatives
+- [ ] **Supabase session too large for SecureStore** – The persisted auth session exceeds SecureStore's 2048-byte limit on Android (warning today, error in a future SDK → persistent login at risk in the APK). Move the Supabase auth storage to AsyncStorage (or the LargeSecureStore pattern from the Supabase docs).
+- [ ] **EAS Update (OTA) setup** – Install `expo-updates`, set `runtimeVersion` (`appVersion` policy) and `updates.url` in `app.json`, rebuild the APK, then enable the `update` job in `.github/workflows/eas-production.yml`. Also lets testers open a preview from expo.dev → Updates in Expo Go.
+- [ ] **New Architecture** – Expo Go always runs the New Architecture while `app.json` has `newArchEnabled: false` (APK = old arch). This is why Expo Go and the APK can behave differently; always smoke-test on the APK. Evaluate switching to `newArchEnabled: true` once `react-native-draggable-flatlist`/reanimated warnings are sorted out.
+- [ ] **Draggable list warnings** – `react-native-draggable-flatlist` logs "GestureDetector has received a child that may get view-flattened" and Reanimated "Tried to modify key `current`" under the New Architecture (Expo Go). Harmless for now; wrap row content in `<View collapsable={false}>` or upgrade the library.
+- [ ] **Web console warning** – `findDOMNode is deprecated` from react-native-web in `(tabs)/_layout.tsx` on web. Cosmetic.
 
 
 ## BACKLOG
@@ -18,8 +19,6 @@
 ### Medium Priority
 
 - [ ] **Exercise library** – Pre-built exercise catalog with muscle group tags.
-- [ ] **Sheet templates** – Clone/duplicate an existing sheet.
-- [ ] **Settings screen** – Add a top-right settings button and allow display name/password updates, rest timer enable/disable, default rest time, and theme selection (light/dark; light theme implementation pending).
 - [ ] **UI/UX polish pass** – Apply small usability and visual improvements across core daily flows.
 
 ### Low Priority
@@ -29,6 +28,16 @@
 
 
 ## Done
+
+- [x] **Real Android notifications** – `expo-notifications` with a daily reminder and a monochrome status-bar icon (v1.2.0).
+- [x] **Resume an in-progress workout** – Cached locally and restored from the server, with Resume/Discard entry points and auto-close after 6h (v1.2.0).
+- [x] **Session notes** – Shown in the history detail and synced back to the sheet template on finish (v1.2.0).
+- [x] **Sheet templates** – Duplicate a sheet with its exercises, sets and notes (v1.2.0).
+- [x] **Import / export sheets** – JSON, CSV and PDF (v1.2.0).
+- [x] **History scalability** – Only the month on screen is fetched (v1.2.0).
+
+- [x] **UI polish on sheet** – Rename button with pencil icon (restored from main's sheet screen).
+- [x] **Reset query cache on login/logout** – Persisted React Query cache no longer shows stale/other-user data after a fresh login.
 
 - [x] Initial project setup (Expo + NativeWind + monorepo)
 - [x] Workout sheets CRUD
@@ -51,9 +60,10 @@
 - [x] **Deploy web app to Vercel** – Run `vercel --prod` from root or connect GitHub repo to Vercel dashboard.
 - [X] **Sheet card tap target** – Make the entire sheet card tappable, not only the sheet name.
 - [X] **Set autofill from previous set** – When creating a new set, prefill weight, reps, and rest from the previous set in that exercise.
-- [X] **Custom splash screen, icon, and favicon** – Replace default Expo assets and use `./logo.png` (512x512) as app icon plus `./favicon.ico` for web favicon.
+- [X] **Custom splash screen, icon, and favicon** – Brand assets in `apps/mobile/assets/` (app icon, Android adaptive icon, splash lockup, web favicon).
 - [X] **Workout statistics** – Charts showing progress over time (weight lifted, volume, frequency).
 - [X] **Push notifications** – Workout reminders (Expo Notifications).
 - [X] **Drag-to-reorder exercises** – Within a sheet, reorder exercises by dragging.
-
-
+- [X] **Enhance settings** - Add options for rest timer, theme selection, and account management.
+- [X] **Light Theme** – Real light theme alongside dark and system. CSS variables drive Tailwind tokens; PreferencesContext exposes a resolved theme; settings screen offers Dark / Light / System.
+- [X] **Local query cache** – Persist react-query cache to AsyncStorage so the app loads instantly from cache on cold start and refetches in the background. (Lighter alternative to PowerSync; full offline-first sync remains future work.)

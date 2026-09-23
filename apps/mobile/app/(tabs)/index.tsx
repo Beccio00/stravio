@@ -4,22 +4,28 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import {
   Check,
-  ChevronRight,
+  Copy,
+  Flame,
   GripVertical,
-  LogOut,
+  MoreHorizontal,
   PencilLine,
+  Play,
   Plus,
   SquarePen,
+  Trash2,
 } from "lucide-react-native";
+import type { LucideIcon } from "lucide-react-native";
 import DraggableFlatList, { ScaleDecorator } from "react-native-draggable-flatlist";
 import type { RenderItemParams } from "react-native-draggable-flatlist";
 import { TouchableOpacity as GHTouchableOpacity } from "react-native-gesture-handler";
 import { cssInterop } from "nativewind";
 import type { WorkoutSheet } from "@bhmt3wp/shared";
-import { useAuth } from "../../src/contexts/AuthContext";
 import {
+  useActiveSessions,
+  useCloseSession,
   useCreateSheet,
   useDeleteSheet,
+  useDuplicateSheet,
   useReorderSheets,
   useSheets,
   useUpdateSheet,
@@ -38,16 +44,20 @@ cssInterop(GHTouchableOpacity, { className: "style" });
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { signOut } = useAuth();
   const { data: sheets, isLoading, error } = useSheets();
   const createSheet = useCreateSheet();
   const deleteSheet = useDeleteSheet();
+  const duplicateSheet = useDuplicateSheet();
   const updateSheet = useUpdateSheet();
   const reorderSheets = useReorderSheets();
+  const { data: activeSessions } = useActiveSessions();
+  const closeSession = useCloseSession();
+  const activeSession = activeSessions?.[0];
 
   const [newSheetName, setNewSheetName] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [editingSheetId, setEditingSheetId] = useState<string | null>(null);
+  const [menuSheetId, setMenuSheetId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
   const [listData, setListData] = useState<WorkoutSheet[]>([]);
 
@@ -90,8 +100,29 @@ export default function HomeScreen() {
   };
 
   const beginRename = (item: WorkoutSheet) => {
+    setMenuSheetId(null);
     setEditingSheetId(item.id);
     setRenameDraft(item.name);
+  };
+
+  const handleDuplicate = (item: WorkoutSheet) => {
+    setMenuSheetId(null);
+    duplicateSheet.mutate(item.id, {
+      onError: (err) => {
+        const msg = err instanceof Error ? err.message : "Could not duplicate sheet";
+        if (Platform.OS === "web") {
+          window.alert(msg);
+        } else {
+          Alert.alert("Duplicate failed", msg);
+        }
+      },
+    });
+  };
+
+  // Inline action menu (works the same on web and native; long-press on
+  // native is just a shortcut to open it).
+  const toggleSheetMenu = (item: WorkoutSheet) => {
+    setMenuSheetId((current) => (current === item.id ? null : item.id));
   };
 
   const applyRename = () => {
@@ -122,85 +153,109 @@ export default function HomeScreen() {
 
   const renderSheet = ({ item, drag, isActive }: RenderItemParams<WorkoutSheet>) => {
     const isEditing = editingSheetId === item.id;
+    const isMenuOpen = menuSheetId === item.id;
 
+    // The "open sheet" touchable wraps only the title block: the drag handle,
+    // the options button and the inline menu are siblings, so their presses
+    // never reach it (stopPropagation doesn't stop gesture-handler touchables).
     return (
       <ScaleDecorator>
-        <GHTouchableOpacity
-          className="w-full"
-          onPress={() => router.push(`/sheet/${item.id}`)}
-          onLongPress={() => handleDelete(item.id, item.name)}
-          delayLongPress={350}
-          disabled={isEditing}
-          activeOpacity={0.75}
-        >
-          <Card className={`w-full mb-3 ${isActive ? "opacity-90" : ""}`}>
-            <View className="flex-row items-center">
-              {!isEditing ? (
-                <GHTouchableOpacity
-                  onLongPress={drag}
-                  delayLongPress={180}
-                  disabled={reorderSheets.isPending}
-                  className="mr-1 h-9 w-8 items-center justify-center"
-                  accessibilityLabel="Hold and drag to reorder sheet"
-                  accessibilityRole="button"
-                >
-                  <GripVertical size={ICON_SIZE} strokeWidth={ICON_STROKE} color="#7c8aa5" />
-                </GHTouchableOpacity>
-              ) : null}
+        <Card className={`w-full mb-3 ${isActive ? "opacity-90" : ""}`}>
+          <View className="flex-row items-center">
+            {!isEditing ? (
+              <GHTouchableOpacity
+                onLongPress={drag}
+                delayLongPress={180}
+                disabled={reorderSheets.isPending}
+                className="mr-1 h-9 w-8 items-center justify-center"
+                accessibilityLabel="Hold and drag to reorder sheet"
+                accessibilityRole="button"
+              >
+                <GripVertical size={ICON_SIZE} strokeWidth={ICON_STROKE} color="#7c8aa5" />
+              </GHTouchableOpacity>
+            ) : null}
 
-              {isEditing ? (
-                <View className="flex-1 flex-row items-center">
-                  <Input
-                    value={renameDraft}
-                    onChangeText={setRenameDraft}
-                    placeholder="Sheet name"
-                    editable={!updateSheet.isPending}
-                    onSubmitEditing={applyRename}
-                    containerClassName="flex-1"
-                    inputClassName="text-lg font-semibold"
-                    returnKeyType="done"
-                  />
-                  <TouchableOpacity
-                    onPress={applyRename}
-                    disabled={updateSheet.isPending}
-                    className="ml-2 h-10 w-10 items-center justify-center rounded-xl bg-action-secondary border border-border"
-                    accessibilityLabel="Save sheet name"
+            {isEditing ? (
+              <View className="flex-1 flex-row items-center">
+                <Input
+                  value={renameDraft}
+                  onChangeText={setRenameDraft}
+                  placeholder="Sheet name"
+                  editable={!updateSheet.isPending}
+                  onSubmitEditing={applyRename}
+                  containerClassName="flex-1"
+                  inputClassName="text-lg font-semibold"
+                  returnKeyType="done"
+                />
+                <TouchableOpacity
+                  onPress={applyRename}
+                  disabled={updateSheet.isPending}
+                  className="ml-2 h-10 w-10 items-center justify-center rounded-xl bg-action-secondary border border-border"
+                  accessibilityLabel="Save sheet name"
+                >
+                  <Check size={ICON_SIZE} strokeWidth={ICON_STROKE} color="#22c55e" />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <>
+                {/* Fills the row so the whole card area (minus the buttons)
+                    opens the sheet, and pushes the actions to the right edge. */}
+                <View className="flex-1 min-w-0">
+                  <GHTouchableOpacity
+                    className="w-full py-1"
+                    onPress={() => router.push(`/sheet/${item.id}`)}
+                    onLongPress={() => toggleSheetMenu(item)}
+                    delayLongPress={350}
+                    activeOpacity={0.75}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Open ${item.name}`}
                   >
-                    <Check size={ICON_SIZE} strokeWidth={ICON_STROKE} color="#22c55e" />
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <View className="relative flex-1 min-w-0">
-                  <View className="min-w-0 pr-20">
                     <Text className="text-text-primary text-lg font-bold" numberOfLines={1}>
                       {item.name}
                     </Text>
                     <Text className="text-text-muted text-xs mt-1">Tap to open workout plan</Text>
-                  </View>
-
-                  <View
-                    className="absolute inset-y-0 right-0 w-16 flex-row items-center justify-end"
-                    pointerEvents="box-none"
-                  >
-                    <TouchableOpacity
-                      onPress={(event) => {
-                        event.stopPropagation();
-                        beginRename(item);
-                      }}
-                      className="mr-2 h-9 w-9 items-center justify-center rounded-xl bg-action-secondary border border-border"
-                      accessibilityLabel="Rename sheet"
-                    >
-                      <PencilLine size={ICON_SIZE} strokeWidth={ICON_STROKE} color="#c0c9d8" />
-                    </TouchableOpacity>
-                    <View className="w-4 items-center">
-                      <ChevronRight size={ICON_SIZE} strokeWidth={ICON_STROKE} color="#7c8aa5" />
-                    </View>
-                  </View>
+                  </GHTouchableOpacity>
                 </View>
-              )}
+
+                <TouchableOpacity
+                  onPress={() => toggleSheetMenu(item)}
+                  className={`ml-2 h-9 w-9 items-center justify-center rounded-xl border ${
+                    isMenuOpen ? "bg-action-primary border-action-primary" : "bg-action-secondary border-border"
+                  }`}
+                  accessibilityLabel="Sheet options"
+                  accessibilityRole="button"
+                >
+                  <MoreHorizontal
+                    size={ICON_SIZE}
+                    strokeWidth={ICON_STROKE}
+                    color={isMenuOpen ? "#ffffff" : "#c0c9d8"}
+                  />
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+
+          {isMenuOpen && !isEditing ? (
+            <View className="mt-3 flex-row gap-2 border-t border-border pt-3">
+              <SheetAction label="Rename" icon={PencilLine} onPress={() => beginRename(item)} />
+              <SheetAction
+                label="Duplicate"
+                icon={Copy}
+                onPress={() => handleDuplicate(item)}
+                loading={duplicateSheet.isPending}
+              />
+              <SheetAction
+                label="Delete"
+                icon={Trash2}
+                tone="danger"
+                onPress={() => {
+                  setMenuSheetId(null);
+                  handleDelete(item.id, item.name);
+                }}
+              />
             </View>
-          </Card>
-        </GHTouchableOpacity>
+          ) : null}
+        </Card>
       </ScaleDecorator>
     );
   };
@@ -210,10 +265,51 @@ export default function HomeScreen() {
       <View className="px-5 pt-3 pb-2">
         <ScreenHeader
           title="My Sheets"
-          subtitle="Create your plan, drag to reorder, long press a title to delete."
+          subtitle="Create your plan, drag to reorder, long-press for options."
           icon={SquarePen}
-          rightAction={<Button label="Sign out" icon={LogOut} size="sm" variant="ghost" onPress={signOut} />}
         />
+
+        {activeSession ? (
+          <Card className="mt-4" padding="md">
+            <View className="flex-row items-center">
+              <Flame size={16} strokeWidth={ICON_STROKE} color="#22c55e" />
+              <Text className="ml-1.5 text-emphasis text-xs font-semibold uppercase">
+                Workout in progress
+              </Text>
+            </View>
+            <Text className="text-text-primary text-base font-bold mt-1" numberOfLines={1}>
+              {activeSession.sheetName}
+            </Text>
+            <Text className="text-text-muted text-xs mt-1">
+              Started {formatStartedAt(activeSession.startedAt)}
+            </Text>
+
+            <View className="mt-3 flex-row gap-2">
+              <Button
+                label="Resume"
+                icon={Play}
+                size="sm"
+                className="flex-1"
+                onPress={() =>
+                  router.push(`/workout/${activeSession.id}?sheetId=${activeSession.sheetId}`)
+                }
+              />
+              <Button
+                label="Discard"
+                icon={Trash2}
+                size="sm"
+                variant="secondary"
+                className="flex-1"
+                loading={closeSession.isPending}
+                onPress={() =>
+                  confirmDiscard(activeSession.sheetName, () =>
+                    closeSession.mutate(activeSession.id),
+                  )
+                }
+              />
+            </View>
+          </Card>
+        ) : null}
 
         <Button
           label="Create sheet"
@@ -246,7 +342,10 @@ export default function HomeScreen() {
               reorderSheets.mutate(data.map((s) => s.id));
             }
           }}
-          extraData={[editingSheetId, renameDraft, updateSheet.isPending, reorderSheets.isPending]}
+          extraData={[editingSheetId, menuSheetId, renameDraft, updateSheet.isPending, reorderSheets.isPending, duplicateSheet.isPending]}
+          // Without flex the wrapper takes its intrinsic height and the list
+          // cannot scroll on web.
+          containerStyle={{ flex: 1 }}
           contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 140 }}
           ListEmptyComponent={
             <StateBlock
@@ -308,4 +407,53 @@ export default function HomeScreen() {
       </TouchableOpacity>
     </SafeAreaView>
   );
+}
+
+function SheetAction({
+  label,
+  icon,
+  onPress,
+  tone = "default",
+  loading = false,
+}: {
+  label: string;
+  icon: LucideIcon;
+  onPress: () => void;
+  tone?: "default" | "danger";
+  loading?: boolean;
+}) {
+  return (
+    <Button
+      label={label}
+      icon={icon}
+      size="sm"
+      variant={tone === "danger" ? "danger" : "secondary"}
+      onPress={onPress}
+      loading={loading}
+      className="flex-1"
+    />
+  );
+}
+
+/** "12 min ago" / "2 hours ago" — sessions older than 6h are closed automatically. */
+function formatStartedAt(startedAt: string): string {
+  const minutes = Math.max(0, Math.round((Date.now() - new Date(startedAt).getTime()) / 60000));
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  return hours === 1 ? "1 hour ago" : `${hours} hours ago`;
+}
+
+function confirmDiscard(sheetName: string, onConfirm: () => void) {
+  const title = "Discard workout";
+  const message = `Stop the workout in progress on "${sheetName}"? Sets you already marked as done are kept in your history.`;
+
+  if (Platform.OS === "web") {
+    if (window.confirm(`${title}\n\n${message}`)) onConfirm();
+  } else {
+    Alert.alert(title, message, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Discard", style: "destructive", onPress: onConfirm },
+    ]);
+  }
 }

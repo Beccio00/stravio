@@ -2,69 +2,89 @@
 
 ## Scope
 
-This document defines the operational release flow for Stravio v1.
+The operational release flow for Stravio: work lands on `dev`, is tested
+locally and on a real device, and only then reaches `main` and production.
 
-v1 goals:
-- Unified UX without role selection.
-- Signup always stored as `allievo` in DB metadata.
-- Open source distribution under AGPL-3.0.
-- Deliverable artifacts: Android build, iOS build, web deployment.
+Nothing deploys by itself. `vercel.json` sets `git.deploymentEnabled: false`
+because the GitHub integration builds without the Supabase environment
+variables and ships a broken bundle; production is published manually from a
+machine that has `apps/mobile/.env`.
 
 ## Prerequisites
 
-- EAS CLI installed and authenticated.
-- Apple developer credentials configured for iOS builds.
-- Supabase production project configured in app config.
-- Clean git working tree for tagged releases.
+- `eas-cli` authenticated on the account that owns the `stravio` project.
+- `vercel` CLI logged in and the repo linked (`vercel link`).
+- `apps/mobile/.env` filled in (see `.env.example`).
+- Clean git working tree.
 
 ## 1. Pre-release checks
 
-From repository root:
+From the repository root, on `dev`:
 
 ```bash
 npm install
-npm run web -w apps/mobile
+npx tsc --noEmit -p apps/mobile/tsconfig.json
+npx tsc --noEmit -p packages/shared/tsconfig.json
+cd apps/mobile && npx -y expo-doctor   # must report all checks passing
 ```
 
-Then verify manually:
-- Signup works and creates user.
-- No role selection in signup UI.
-- No profile icon/name block in home header.
-- Sheet CRUD and workout session flow still work.
-
-## 2. Build artifacts
-
-### Android (APK preview)
+Then exercise the app, web and device:
 
 ```bash
-eas build --platform android --profile preview
+npm run web -w apps/mobile   # browser, http://localhost:8081
+npm run dev -w apps/mobile   # phone, via Expo Go
 ```
 
-### Android (store-ready, if configured)
+- Sign up / sign in, sheets list scrolls and reorders.
+- Sheet: rename, duplicate, delete, add exercises and sets.
+- Workout: Done/Undo, rest timer, notes, Finish; resume from the Home banner.
+- History: move between months; Stats render.
+- Settings: theme, rest timer, export/import, Sign out.
+
+Expo Go is not enough on its own: it always runs the New Architecture and
+ships its own native modules, so anything touching `app.json` or a native
+dependency must be verified on an APK (see step 3).
+
+## 2. Bump the version
+
+Set `expo.version` in `apps/mobile/app.json` to the release version; it is what
+the Settings footer shows and what EAS stamps on the artifacts. The Android
+`versionCode` is managed by EAS (`appVersionSource: remote`) and auto-increments
+on the `production` profile only.
+
+Update `docs/CHANGELOG.md` with the new section.
+
+## 3. Build artifacts
 
 ```bash
-eas build --platform android --profile production
+cd apps/mobile
+eas build --platform android --profile preview      # APK, installable directly
+eas build --platform android --profile production   # AAB, only for Google Play
 ```
 
-### iOS
+The APK link goes in the README. The AAB is not installable on a phone; it is
+only useful when publishing to Play (which also needs a developer account, a
+store listing and `eas submit`).
+
+iOS builds need Apple credentials configured in EAS:
 
 ```bash
 eas build --platform ios --profile production
 ```
 
-## 3. OTA update publish
-
-Use this when app binaries are already installed and only JS/assets changed.
-
-```bash
-eas update --branch production --message "v1 release"
-```
-
 ## 4. Web release (Vercel)
 
+From `main`, on a machine with `apps/mobile/.env`:
+
 ```bash
-vercel --prod
+npx vercel --prod
 ```
+
+Preview deployments for a branch use `npx vercel` (no `--prod`); they are
+login-protected.
+
+OTA updates (`eas update`) are **not** configured yet: `expo-updates` and
+`runtimeVersion` are missing from the app config. See `docs/TODO.md`.
 
 ## 5. Versioning and changelog
 
@@ -80,26 +100,28 @@ Release naming (recommended):
 ```bash
 git checkout main
 git pull --ff-only origin main
-git merge --no-ff dev -m "release: v1.0.0"
+git merge --no-ff dev -m "release: v1.2.0"
 git push origin main
 ```
 
-- Create annotated git tag, for example:
+- Create an annotated tag matching `expo.version`:
 
 ```bash
-git tag -a v1.0.0 -m "Stravio v1"
-git push origin v1.0.0
+git tag -a v1.2.0 -m "Stravio v1.2.0"
+git push origin v1.2.0
 ```
 
 ## 6. Post-release smoke checks
 
-- Install Android artifact and run login + core workout flow.
-- Install iOS artifact and run login + core workout flow.
-- Open web deployment and verify routing and auth.
+- Install the APK: it opens, login works, a full workout can be logged.
+- Open https://stravio-project.vercel.app: routing, auth, and the Settings
+  footer showing the released version.
+- `eas build:list` shows the expected `appVersion` on both artifacts.
 - Confirm Supabase inserts remain scoped by RLS.
 
 ## 7. Rollback strategy
 
-- Web: redeploy previous Vercel deployment.
-- OTA: publish a corrective EAS update on the same branch.
-- Binary: re-promote previous stable build from EAS history.
+- Web: `vercel ls --prod`, then promote the previous deployment
+  (`vercel promote <url>`), or redeploy the previous tag.
+- Binary: share the APK of the previous build from the EAS dashboard.
+- OTA would be the fastest path, but it is not configured yet.

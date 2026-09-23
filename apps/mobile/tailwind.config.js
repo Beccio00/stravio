@@ -5,17 +5,17 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Dark athletic baseline
-        background: "#0b1220",
-        surface: "#121b2e",
-        "surface-light": "#1a2740",
-        "surface-muted": "#0f1728",
+        // Themeable tokens — resolved via CSS variables
+        background: "var(--color-background)",
+        surface: "var(--color-surface)",
+        "surface-light": "var(--color-surface-light)",
+        "surface-muted": "var(--color-surface-muted)",
 
-        // Action roles
+        // Action roles — fixed across themes
         "action-primary": "#3b82f6",
         "action-primary-press": "#2563eb",
-        "action-secondary": "#1f2b44",
-        "action-secondary-press": "#2a3b5f",
+        "action-secondary": "var(--color-action-secondary)",
+        "action-secondary-press": "var(--color-action-secondary-press)",
         emphasis: "#22c55e",
         danger: "#ef4444",
 
@@ -24,11 +24,11 @@ module.exports = {
         "primary-light": "#60a5fa",
         accent: "#22c55e",
 
-        // Typography and chrome
-        "text-primary": "#f8fafc",
-        "text-secondary": "#c0c9d8",
-        "text-muted": "#7c8aa5",
-        border: "#24324a",
+        // Typography and chrome — themeable
+        "text-primary": "var(--color-text-primary)",
+        "text-secondary": "var(--color-text-secondary)",
+        "text-muted": "var(--color-text-muted)",
+        border: "var(--color-border)",
         "tab-active": "#3b82f6",
         "tab-inactive": "#7c8aa5",
       },
