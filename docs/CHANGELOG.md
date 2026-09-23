@@ -2,7 +2,37 @@
 
 All notable changes to Stravio.
 
-## [Unreleased]
+## [1.2.0] - 2026-09-23
+
+### Added
+- **Resume a workout**: an interrupted session can be picked up again from the Home banner or from its sheet (Start becomes Resume); values typed but not yet logged survive leaving the screen, and done sets are restored from the server, so a session resumes after a reinstall or on another device
+- **One workout at a time**: starting a workout on another sheet asks for confirmation and closes the open one; sessions untouched for 6 hours close by themselves (completed if sets were logged, discarded if empty)
+- **Duplicate a sheet**: a `⋯` menu on each sheet card with Rename / Duplicate / Delete, working the same on web and mobile; the copy lands at the top of the list with all exercises, sets and notes
+- **Import / export sheets**: export every sheet as JSON (re-importable backup), CSV (one row per set) or PDF (printable summary), and import back from JSON or CSV — existing sheets are never modified
+- **Real Android notifications**: the daily reminder is scheduled through `expo-notifications` with its own monochrome status-bar icon (it was a no-op stub before)
+- **Session notes in history**: notes written during a workout are shown in the session detail and carried back to the sheet template when the workout is finished
+- **Rest timer settings**: enable/disable the countdown and pick the default rest for new sets
+- **Account section**: e-mail and Sign out in Settings
+- **New branding**: app icon, Android adaptive icon, splash and web favicon from the new logo; lockup in the README
+- **CI**: every pull request runs a type-check, `expo doctor` and a web export
+
+### Changed
+- History loads only the month on screen instead of every session ever recorded
+- Stats fetch the 10 sessions they chart instead of the whole table
+- Android system bars follow the selected theme (dark, light or system)
+
+### Fixed
+- App crashed on launch in the APK: two copies of `react-native-safe-area-context` were installed, so Android linked one and the JS bundle loaded the other
+- Home and Sheet lists could not be scrolled past the fold on web
+- Sheets stayed empty after signing in until a manual reload, and cached data could leak between accounts on the same device
+- Settings crashed on web, where `expo-secure-store` has no implementation
+- The white system navigation bar at the bottom on Android
+- Drag-to-reorder for exercises and the polished sheet/workout screens, lost in an earlier merge
+- `expo doctor` failures: Metro no longer replaces Expo's default watch folders, and `react-native-safe-area-context` matches the SDK
+
+---
+
+## [1.1.0] - 2026-04-30
 
 ### Changed
 - **API client**: Switched from local SQLite / Fastify HTTP to Supabase JS client
