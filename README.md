@@ -9,14 +9,11 @@
   Open source workout sheet manager — build your sheets, log every set in real time, and track progress on Android, iOS and Web.
 </p>
 
-<p align="center">
-  <img src="docs/screenshots/login.png" width="200" alt="Login" />
-  <img src="docs/screenshots/home.png" width="200" alt="Home" />
-  <img src="docs/screenshots/sheet.png" width="200" alt="Sheet Detail" />
-  <img src="docs/screenshots/workout.png" width="200" alt="Workout" />
-</p>
+## Demo
 
-> **Screenshots**: Place your screenshots in `docs/screenshots/` with the names referenced above.
+Sheets, a logged workout, history and stats — in 35 seconds.
+
+https://github.com/user-attachments/assets/c066feba-f3a6-4754-a3d1-762e2abd34e8
 
 ---
 
@@ -202,22 +199,6 @@ The Supabase Postgres database has 7 tables:
 | `session_exercise_notes` | Notes per exercise during a session |
 
 All tables have Row Level Security (RLS) policies ensuring users only access their own data.
-
----
-
-## Screenshots
-
-Place your app screenshots in `docs/screenshots/`:
-
-| File | Screen |
-|------|--------|
-| `login.png` | Login screen |
-| `signup.png` | Signup screen |
-| `home.png` | Home screen (sheet list) |
-| `sheet.png` | Sheet detail (exercises + sets) |
-| `workout.png` | Active workout session |
-| `history.png` | History calendar view |
-| `session.png` | Session detail review |
 
 ---
 
