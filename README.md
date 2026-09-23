@@ -11,7 +11,9 @@
 
 ## Demo
 
-[**Watch the 35s demo**](docs/demo.mp4) — sheets, a logged workout, history and stats.
+Sheets, a logged workout, history and stats — in 35 seconds.
+
+https://github.com/user-attachments/assets/c066feba-f3a6-4754-a3d1-762e2abd34e8
 
 ---
 
