@@ -12,6 +12,7 @@
   "dependencies": {
     "@bhmt3wp/shared": "*",
     "@expo/metro-runtime": "~4.0.0",
+    "@notifee/react-native": "9.1.8",
     "@react-native-async-storage/async-storage": "1.23.1",
     "@react-navigation/native": "^7.0.0",
     "@supabase/supabase-js": "^2.99.0",

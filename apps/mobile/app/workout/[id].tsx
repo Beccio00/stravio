@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
+  AppState,
   Platform,
   ScrollView,
   Text,
@@ -27,8 +28,14 @@ import { prefs } from "../../src/lib/preferences";
 import {
   clearSessionState,
   loadSessionState,
+  saveRestEndsAt,
   saveSessionState,
 } from "../../src/lib/sessionCache";
+import {
+  cancelRestNotifications,
+  showRestNotification,
+} from "../../src/lib/restNotifications";
+import { REST_TICK_MS, formatRest, restSecondsLeft } from "../../src/lib/restTimer";
 import {
   Check,
   Clock3,
@@ -91,8 +98,12 @@ export default function WorkoutScreen() {
   const [editValues, setEditValues] = useState<Record<string, { kg: string; reps: string }>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  // The rest timer is a deadline, never a counter: see src/lib/restTimer.ts.
+  const [restEndsAt, setRestEndsAt] = useState<number | null>(null);
   const [restTimeLeft, setRestTimeLeft] = useState(0);
   const [restEnabled, setRestEnabled] = useState(true);
+  const restEndsAtRef = useRef<number | null>(null);
+  restEndsAtRef.current = restEndsAt;
 
   // Restore an in-progress session: the local cache holds the values the user
   // typed but hasn't logged yet; the server logs are the source of truth for
@@ -119,6 +130,12 @@ export default function WorkoutScreen() {
       if (isFresh) {
         setEditValues((prev) => ({ ...prev, ...cached.editValues }));
         setNotes((prev) => ({ ...prev, ...cached.notes }));
+        // A deadline that has already passed is simply over: restore it only
+        // while it is still in the future, and never ring for it retroactively.
+        const cachedEndsAt = cached.restEndsAt ?? null;
+        if (cachedEndsAt !== null && cachedEndsAt > Date.now()) {
+          setRestEndsAt(cachedEndsAt);
+        }
       }
 
       // Show what was actually logged for the sets already done.
@@ -144,6 +161,9 @@ export default function WorkoutScreen() {
         completedSets: [...completedSets],
         editValues,
         notes,
+        // Carried through so a debounced save cannot clobber a deadline that
+        // `saveRestEndsAt` already wrote.
+        restEndsAt: restEndsAtRef.current,
         updatedAt: Date.now(),
       });
     }, 300);
@@ -185,11 +205,77 @@ export default function WorkoutScreen() {
     setNotes((prev) => ({ ...notesMap, ...prev }));
   }, [exerciseNotes]);
 
+  // Drop the rest from the screen and from the cache, leaving the notifications
+  // alone. Used when the deadline simply ran out: the ongoing notification
+  // removes itself via `timeoutAfter`, and cancelling here could race the bell
+  // trigger and silence it a few milliseconds before it fires.
+  //
+  // `persist: false` is for the callers that are about to delete the whole
+  // cache entry: a fire-and-forget merge could otherwise land afterwards and
+  // bring the entry back from the dead.
+  const clearRestState = useCallback(
+    (persist = true) => {
+      setRestEndsAt(null);
+      restEndsAtRef.current = null;
+      setRestTimeLeft(0);
+      if (persist) void saveRestEndsAt(sessionId, null);
+    },
+    [sessionId],
+  );
+
+  // Stop the rest early — Skip, or finishing the workout. Here the bell must go
+  // too, because it has not rung yet and no longer should.
+  const cancelRest = useCallback(
+    (persist = true) => {
+      clearRestState(persist);
+      void cancelRestNotifications();
+    },
+    [clearRestState],
+  );
+
+  // Refresh the displayed value from the wall clock. The interval only drives
+  // the render: if it never fires (app backgrounded, JS thread suspended) the
+  // value is still right the instant it is recomputed.
   useEffect(() => {
-    if (restTimeLeft <= 0) return;
-    const timer = setTimeout(() => setRestTimeLeft((timeLeft) => timeLeft - 1), 1000);
-    return () => clearTimeout(timer);
-  }, [restTimeLeft]);
+    if (restEndsAt === null) return;
+
+    const tick = () => {
+      const left = restSecondsLeft(restEndsAt);
+      setRestTimeLeft(left);
+      if (left <= 0) clearRestState();
+    };
+
+    tick();
+    const interval = setInterval(tick, REST_TICK_MS);
+    return () => clearInterval(interval);
+  }, [restEndsAt, clearRestState]);
+
+  // Coming back from the background is the moment the old implementation got
+  // wrong. Recompute at once instead of waiting for the next interval tick.
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state !== "active") return;
+      const endsAt = restEndsAtRef.current;
+      if (endsAt === null) return;
+      const left = restSecondsLeft(endsAt);
+      if (left <= 0) {
+        // The rest finished while we were away: close the card, do not replay
+        // the bell — Android already rang it from the scheduled trigger.
+        clearRestState();
+      } else {
+        setRestTimeLeft(left);
+      }
+    });
+    return () => sub.remove();
+  }, [clearRestState]);
+
+  // Leaving the screen ends the rest: nothing should keep ticking in the shade
+  // for a workout the user is no longer looking at.
+  useEffect(() => {
+    return () => {
+      void cancelRestNotifications();
+    };
+  }, []);
 
   const getEditValue = (exerciseId: string, setNumber: number) => {
     const key = `${exerciseId}-${setNumber}`;
@@ -247,8 +333,19 @@ export default function WorkoutScreen() {
     }
 
     setCompletedSets((prev) => new Set(prev).add(key));
-    if (restEnabled) {
+    if (restEnabled && set.restTimeSec > 0) {
+      const endsAt = Date.now() + set.restTimeSec * 1000;
+      setRestEndsAt(endsAt);
+      restEndsAtRef.current = endsAt;
       setRestTimeLeft(set.restTimeSec);
+      // Persisted straight away rather than through the 300 ms debounce: the
+      // deadline is the one value that is worthless if it lands late.
+      void saveRestEndsAt(sessionId, endsAt);
+      void showRestNotification({
+        endsAt,
+        exerciseName: exercise.name,
+        setNumber: set.setNumber,
+      });
     }
   };
 
@@ -290,6 +387,7 @@ export default function WorkoutScreen() {
 
     confirmAction("Finish workout", "Do you want to complete this session now?", async () => {
       try {
+        cancelRest(false);
         await completeSession.mutateAsync(sessionId);
         await clearSessionState(sessionId);
 
@@ -370,7 +468,7 @@ export default function WorkoutScreen() {
                 <Clock3 size={16} strokeWidth={ICON_STROKE} color="#60a5fa" />
                 <Text className="ml-2 text-text-secondary text-sm font-semibold uppercase">Rest timer</Text>
               </View>
-              <TouchableOpacity onPress={() => setRestTimeLeft(0)}>
+              <TouchableOpacity onPress={() => cancelRest()}>
                 <View className="flex-row items-center">
                   <TimerReset size={14} strokeWidth={ICON_STROKE} color="#7c8aa5" />
                   <Text className="ml-1 text-text-muted text-xs">Skip</Text>
@@ -379,7 +477,7 @@ export default function WorkoutScreen() {
             </View>
 
             <Text className="mt-2 text-text-primary text-4xl font-bold">
-              {Math.floor(restTimeLeft / 60)}:{(restTimeLeft % 60).toString().padStart(2, "0")}
+              {formatRest(restTimeLeft)}
             </Text>
           </Card>
         </View>
