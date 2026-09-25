@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Alert, Platform, ScrollView, Switch, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Constants from "expo-constants";
@@ -18,14 +18,21 @@ import {
   Upload,
   User,
 } from "lucide-react-native";
-import { Card, ICON_STROKE, ScreenHeader, StateBlock } from "../../../src/components/ui";
+import { useQueryClient } from "@tanstack/react-query";
+import { Card, ICON_STROKE, ProgressBar, ScreenHeader, StateBlock } from "../../../src/components/ui";
 import { useAuth } from "../../../src/contexts/AuthContext";
 import { usePreferences, type ThemePreference } from "../../../src/contexts/PreferencesContext";
 import * as notifications from "../../../src/lib/notifications";
 import { prefs } from "../../../src/lib/preferences";
-import { useImportSheets, useSheets } from "../../../src/api/hooks";
+import { useSheets } from "../../../src/api/hooks";
 import { api } from "../../../src/api/client";
 import { exportCSV, exportJSON, exportPDF, pickAndParseFile } from "../../../src/lib/sheetsIO";
+import {
+  formatBytes,
+  type IOPhase,
+  type IOProgress,
+  type IOProgressFn,
+} from "../../../src/lib/ioProgress";
 import type { WorkoutSheetFull } from "@bhmt3wp/shared";
 
 type ThemeOption = {
@@ -42,6 +49,9 @@ const THEME_OPTIONS: ThemeOption[] = [
 
 const REST_OPTIONS = [30, 45, 60, 90, 120];
 
+/** A stopped bar at 2% is invisible; keep a sliver of red so the failure reads. */
+const MIN_ERROR_RATIO = 0.06;
+
 function ActionRow({
   icon: Icon,
   label,
@@ -49,6 +59,7 @@ function ActionRow({
   onPress,
   disabled = false,
   color = "#60a5fa",
+  accessory,
 }: {
   icon: LucideIcon;
   label: string;
@@ -56,25 +67,78 @@ function ActionRow({
   onPress: () => void;
   disabled?: boolean;
   color?: string;
+  /** Rendered below the row, outside the touchable so it keeps full opacity. */
+  accessory?: ReactNode;
 }) {
   return (
-    <TouchableOpacity
-      onPress={onPress}
-      disabled={disabled}
-      activeOpacity={0.75}
-      accessibilityRole="button"
-      className={disabled ? "opacity-50" : ""}
-    >
-      <View className="flex-row items-center py-3">
-        <View className="mr-3 h-8 w-8 items-center justify-center rounded-xl bg-action-secondary border border-border">
-          <Icon size={16} strokeWidth={ICON_STROKE} color={color} />
+    <View>
+      <TouchableOpacity
+        onPress={onPress}
+        disabled={disabled}
+        activeOpacity={0.75}
+        accessibilityRole="button"
+        className={disabled ? "opacity-50" : ""}
+      >
+        <View className="flex-row items-center py-3">
+          <View className="mr-3 h-8 w-8 items-center justify-center rounded-xl bg-action-secondary border border-border">
+            <Icon size={16} strokeWidth={ICON_STROKE} color={color} />
+          </View>
+          <View className="flex-1">
+            <Text className="text-text-primary text-base font-semibold">{label}</Text>
+            <Text className="text-text-secondary text-sm mt-0.5">{description}</Text>
+          </View>
         </View>
-        <View className="flex-1">
-          <Text className="text-text-primary text-base font-semibold">{label}</Text>
-          <Text className="text-text-secondary text-sm mt-0.5">{description}</Text>
-        </View>
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+      {accessory ? <View className="pb-3">{accessory}</View> : null}
+    </View>
+  );
+}
+
+const IMPORT_PHASE_LABEL: Partial<Record<IOPhase, string>> = {
+  picking: "Waiting for a file…",
+  reading: "Reading file…",
+  parsing: "Reading file…",
+  writing: "Importing sheets…",
+  sharing: "Importing sheets…",
+  done: "Import complete",
+  error: "Import failed",
+};
+
+/**
+ * The bar tracks work units, not bytes: the percentage comes from sheets
+ * fetched or exercises written, and the file size is shown as a plain label.
+ */
+function IOProgressBlock({
+  progress,
+  labels,
+}: {
+  progress: IOProgress;
+  labels: Partial<Record<IOPhase, string>>;
+}) {
+  const tone =
+    progress.phase === "error"
+      ? "error"
+      : progress.phase === "done" || progress.phase === "sharing"
+        ? "done"
+        : "progress";
+
+  const detail = [
+    progress.bytes !== undefined ? formatBytes(progress.bytes) : null,
+    progress.unit && progress.unit.total > 0
+      ? `${progress.unit.done} / ${progress.unit.total} ${progress.unit.label}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <View>
+      <ProgressBar ratio={progress.ratio} tone={tone} />
+      <Text className="text-text-secondary text-xs mt-2">
+        {progress.message ?? labels[progress.phase] ?? "Working…"}
+      </Text>
+      {detail ? <Text className="text-text-muted text-xs mt-0.5">{detail}</Text> : null}
+    </View>
   );
 }
 
@@ -114,9 +178,10 @@ export default function SettingsScreen() {
   const { theme, setTheme } = usePreferences();
   const { user, signOut } = useAuth();
   const { data: sheets } = useSheets();
-  const importSheets = useImportSheets();
+  const queryClient = useQueryClient();
   const [exportBusy, setExportBusy] = useState(false);
   const [importBusy, setImportBusy] = useState(false);
+  const [importProgress, setImportProgress] = useState<IOProgress | null>(null);
   const [enabled, setEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
   const [restEnabled, setRestEnabled] = useState(true);
@@ -166,28 +231,47 @@ export default function SettingsScreen() {
     }
   };
 
-  const handleImport = async () => {
+  const handleImport = useCallback(async () => {
     if (importBusy) return;
     setImportBusy(true);
+    setImportProgress(null);
+
+    // The byte count arrives once, early; carry it through every later tick.
+    const onProgress: IOProgressFn = (p) =>
+      setImportProgress((prev) => ({ ...p, bytes: p.bytes ?? prev?.bytes }));
+
     try {
-      const parsed = await pickAndParseFile();
-      if (!parsed) return; // cancelled
+      const parsed = await pickAndParseFile(onProgress);
+      if (!parsed) {
+        setImportProgress(null);
+        return; // cancelled
+      }
 
       const noun = parsed.length === 1 ? "sheet" : "sheets";
       const confirmed = await confirmImport(
         `Import ${parsed.length} ${noun}?`,
         `"${parsed.map((s) => s.name).join('", "')}" will be added to your sheets. Existing sheets are not modified.`,
       );
-      if (!confirmed) return;
+      if (!confirmed) {
+        setImportProgress(null);
+        return;
+      }
 
-      await importSheets.mutateAsync(parsed);
+      await api.sheets.import(parsed, onProgress);
+      await queryClient.invalidateQueries({ queryKey: ["sheets"] });
       notify("Import complete", `${parsed.length} ${noun} imported.`);
     } catch (err) {
+      setImportProgress((prev) => ({
+        phase: "error",
+        ratio: Math.max(prev?.ratio ?? 0, MIN_ERROR_RATIO),
+        bytes: prev?.bytes,
+        unit: prev?.unit,
+      }));
       notify("Import error", err instanceof Error ? err.message : "Import failed.");
     } finally {
       setImportBusy(false);
     }
-  };
+  }, [importBusy, queryClient]);
 
   const handleToggle = async (value: boolean) => {
     setEnabled(value);
@@ -376,6 +460,13 @@ export default function SettingsScreen() {
             onPress={handleImport}
             disabled={importBusy}
             color="#fb923c"
+            accessory={
+              // The picker is already "busy" but nothing is happening yet: no bar
+              // until real work starts.
+              importProgress && importProgress.phase !== "picking" ? (
+                <IOProgressBlock progress={importProgress} labels={IMPORT_PHASE_LABEL} />
+              ) : null
+            }
           />
         </Card>
         <Text className="text-text-muted text-xs mt-3 px-1 leading-5">

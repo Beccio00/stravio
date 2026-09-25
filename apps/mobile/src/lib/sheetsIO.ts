@@ -15,10 +15,29 @@ import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import * as DocumentPicker from "expo-document-picker";
 import type { WorkoutSheetFull } from "@bhmt3wp/shared";
+import {
+  IMPORT_PHASE_WEIGHTS,
+  formatBytes,
+  phaseRatio,
+  type IOPhase,
+  type IOProgress,
+  type IOProgressFn,
+} from "./ioProgress";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
+
+/**
+ * Nothing in this module is streamed or chunked: the whole file is read into a
+ * string and parsed in one go. Past a few megabytes that is a memory spike and,
+ * on device, a failure deep inside `readAsStringAsync`. Refuse it up front with
+ * a message the user can act on instead.
+ */
+export const MAX_IMPORT_BYTES = 8 * 1024 * 1024;
+
+/** Emit a parse tick roughly every 64 KB so large files actually animate. */
+const PARSE_TICK_CHARS = 64 * 1024;
 
 export interface ImportedSet {
   setNumber: number;
@@ -43,6 +62,28 @@ export interface ImportPayload {
   version: string;
   exportedAt: string;
   sheets: ImportedSheet[];
+}
+
+// ---------------------------------------------------------------------------
+// Progress helpers
+// ---------------------------------------------------------------------------
+
+/** Emits an import-weighted tick. */
+function emitImport(
+  onProgress: IOProgressFn | undefined,
+  phase: IOPhase,
+  fraction: number,
+  extra?: Omit<IOProgress, "phase" | "ratio">,
+): void {
+  onProgress?.({ phase, ratio: phaseRatio(IMPORT_PHASE_WEIGHTS, phase, fraction), ...extra });
+}
+
+function assertImportSize(bytes: number | undefined, filename: string): void {
+  if (bytes === undefined || bytes <= MAX_IMPORT_BYTES) return;
+  throw new Error(
+    `"${filename}" is ${formatBytes(bytes)}, over the ${formatBytes(MAX_IMPORT_BYTES)} import limit. ` +
+      `Split the export into smaller files and import them one at a time.`,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -239,7 +280,11 @@ function sheetsToHTML(sheets: WorkoutSheetFull[]): string {
 // JSON Import parser
 // ---------------------------------------------------------------------------
 
-export function parseJSON(text: string): ImportedSheet[] {
+export function parseJSON(text: string, onProgress?: IOProgressFn): ImportedSheet[] {
+  // `JSON.parse` is atomic — there is no way to subdivide it, so the phase gets
+  // one tick on each side rather than a fake animation.
+  emitImport(onProgress, "parsing", 0);
+
   let parsed: any;
   try {
     parsed = JSON.parse(text);
@@ -251,7 +296,7 @@ export function parseJSON(text: string): ImportedSheet[] {
   const raw: any[] = Array.isArray(parsed) ? parsed : parsed?.sheets;
   if (!Array.isArray(raw)) throw new Error("JSON must contain a 'sheets' array.");
 
-  return raw.map((s: any, si: number) => {
+  const sheets = raw.map((s: any, si: number) => {
     if (typeof s?.name !== "string" || !s.name.trim()) {
       throw new Error(`Sheet #${si + 1} is missing a name.`);
     }
@@ -277,6 +322,9 @@ export function parseJSON(text: string): ImportedSheet[] {
       exercises,
     };
   });
+
+  emitImport(onProgress, "parsing", 1);
+  return sheets;
 }
 
 // ---------------------------------------------------------------------------
@@ -287,13 +335,20 @@ export function parseJSON(text: string): ImportedSheet[] {
  * Splits CSV text into rows of cells, honouring quoted cells that contain
  * commas, escaped quotes or line breaks (exercise notes often do).
  */
-function parseCSVRows(text: string): string[][] {
+function parseCSVRows(text: string, onProgress?: IOProgressFn): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
   let cell = "";
   let inQuote = false;
+  let nextTick = PARSE_TICK_CHARS;
 
   for (let i = 0; i < text.length; i++) {
+    // Progress only reads `i`; it must never touch the tokenizer state.
+    if (onProgress && i >= nextTick) {
+      nextTick = i + PARSE_TICK_CHARS;
+      emitImport(onProgress, "parsing", i / text.length);
+    }
+
     const ch = text[i];
 
     if (inQuote) {
@@ -330,8 +385,9 @@ function parseCSVRows(text: string): string[][] {
   return rows;
 }
 
-export function parseCSV(text: string): ImportedSheet[] {
-  const rows = parseCSVRows(text);
+export function parseCSV(text: string, onProgress?: IOProgressFn): ImportedSheet[] {
+  emitImport(onProgress, "parsing", 0);
+  const rows = parseCSVRows(text, onProgress);
 
   if (rows.length < 2) throw new Error("CSV file is empty or has only a header row.");
 
@@ -391,6 +447,7 @@ export function parseCSV(text: string): ImportedSheet[] {
     });
   }
 
+  emitImport(onProgress, "parsing", 1);
   return sheetOrder.map((name) => sheetsMap.get(name)!);
 }
 
@@ -479,41 +536,110 @@ export async function exportPDF(sheets: WorkoutSheetFull[]): Promise<void> {
 // Public import function
 // ---------------------------------------------------------------------------
 
-export async function pickAndParseFile(): Promise<ImportedSheet[] | null> {
+export async function pickAndParseFile(
+  onProgress?: IOProgressFn,
+): Promise<ImportedSheet[] | null> {
+  // The picker is the user's own time, so it reports 0% — the caller uses this
+  // phase to keep the bar hidden until real work starts.
+  emitImport(onProgress, "picking", 0, { message: "Choose a file…" });
+
   if (Platform.OS === "web") {
-    return pickFileWeb();
+    return pickFileWeb(onProgress);
   }
-  return pickFileNative();
+  return pickFileNative(onProgress);
 }
 
-function pickFileWeb(): Promise<ImportedSheet[] | null> {
+/** Routes a parsed file to the right parser, keeping the byte count attached. */
+function parseByName(
+  text: string,
+  filename: string,
+  bytes: number | undefined,
+  onProgress?: IOProgressFn,
+): ImportedSheet[] {
+  // The parsers do not know the file size, so it is merged into every tick here.
+  const withBytes: IOProgressFn | undefined = onProgress
+    ? (p) => onProgress({ ...p, bytes: p.bytes ?? bytes })
+    : undefined;
+
+  return filename.toLowerCase().endsWith(".csv")
+    ? parseCSV(text, withBytes)
+    : parseJSON(text, withBytes);
+}
+
+function pickFileWeb(onProgress?: IOProgressFn): Promise<ImportedSheet[] | null> {
   return new Promise((resolve, reject) => {
     const input = document.createElement("input");
     input.type = "file";
     input.accept = ".json,.csv,application/json,text/csv";
-    input.onchange = async () => {
+
+    // A file input only fires "change" when a file is chosen. Dismissing the OS
+    // dialog used to leave this promise pending forever, so the Import row
+    // stayed disabled until the screen remounted. "cancel" covers modern
+    // browsers; the window "focus" fallback covers the rest.
+    let settled = false;
+    let picked = false;
+    let graceTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const cleanup = () => {
+      if (graceTimer !== undefined) clearTimeout(graceTimer);
+      input.removeEventListener("change", onChange);
+      input.removeEventListener("cancel", onCancel);
+      window.removeEventListener("focus", onFocus);
+    };
+    const finish = (value: ImportedSheet[] | null) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(value);
+    };
+    const fail = (err: unknown) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(err);
+    };
+
+    const onChange = async () => {
+      // Set synchronously so the focus fallback can never race this.
+      picked = true;
       const file = input.files?.[0];
       if (!file) {
-        resolve(null);
+        finish(null);
         return;
       }
       try {
+        assertImportSize(file.size, file.name);
+        emitImport(onProgress, "reading", 0, {
+          bytes: file.size,
+          message: "Reading file…",
+        });
         const text = await file.text();
-        const name = file.name.toLowerCase();
-        if (name.endsWith(".csv")) {
-          resolve(parseCSV(text));
-        } else {
-          resolve(parseJSON(text));
-        }
+        emitImport(onProgress, "reading", 1, { bytes: file.size });
+        finish(parseByName(text, file.name, file.size, onProgress));
       } catch (err) {
-        reject(err);
+        fail(err);
       }
     };
+
+    const onCancel = () => {
+      if (!picked) finish(null);
+    };
+
+    const onFocus = () => {
+      // "change" normally lands first; give it a moment before giving up.
+      graceTimer = setTimeout(() => {
+        if (!picked) finish(null);
+      }, 800);
+    };
+
+    input.addEventListener("change", onChange);
+    input.addEventListener("cancel", onCancel);
+    window.addEventListener("focus", onFocus, { once: true });
     input.click();
   });
 }
 
-async function pickFileNative(): Promise<ImportedSheet[] | null> {
+async function pickFileNative(onProgress?: IOProgressFn): Promise<ImportedSheet[] | null> {
   const result = await DocumentPicker.getDocumentAsync({
     type: ["application/json", "text/csv", "text/comma-separated-values", "*/*"],
     copyToCacheDirectory: true,
@@ -524,15 +650,25 @@ async function pickFileNative(): Promise<ImportedSheet[] | null> {
   const asset = result.assets[0];
   if (!asset?.uri) return null;
 
+  const name = asset.name ?? asset.uri;
+  let bytes: number | undefined = asset.size ?? undefined;
+  if (bytes === undefined) {
+    try {
+      const info = await FileSystem.getInfoAsync(asset.uri);
+      if (info.exists && !info.isDirectory) bytes = info.size;
+    } catch {
+      // Unknown size: skip the guard and the label rather than block the import.
+    }
+  }
+  assertImportSize(bytes, name);
+
+  emitImport(onProgress, "reading", 0, { bytes, message: "Reading file…" });
   const text = await FileSystem.readAsStringAsync(asset.uri, {
     encoding: FileSystem.EncodingType.UTF8,
   });
+  emitImport(onProgress, "reading", 1, { bytes });
 
-  const name = (asset.name ?? asset.uri).toLowerCase();
-  if (name.endsWith(".csv")) {
-    return parseCSV(text);
-  }
-  return parseJSON(text);
+  return parseByName(text, name, bytes, onProgress);
 }
 
 // ---------------------------------------------------------------------------
