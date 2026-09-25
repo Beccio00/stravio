@@ -4,15 +4,19 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import {
   Check,
+  CheckSquare,
   Copy,
   Flame,
   GripVertical,
+  ListChecks,
   MoreHorizontal,
   PencilLine,
   Play,
   Plus,
+  Square,
   SquarePen,
   Trash2,
+  X,
 } from "lucide-react-native";
 import type { LucideIcon } from "lucide-react-native";
 import DraggableFlatList, { ScaleDecorator } from "react-native-draggable-flatlist";
@@ -25,11 +29,13 @@ import {
   useCloseSession,
   useCreateSheet,
   useDeleteSheet,
+  useDeleteSheets,
   useDuplicateSheet,
   useReorderSheets,
   useSheets,
   useUpdateSheet,
 } from "../../src/api/hooks";
+import { confirm } from "../../src/lib/confirm";
 import {
   Button,
   Card,
@@ -47,6 +53,7 @@ export default function HomeScreen() {
   const { data: sheets, isLoading, error } = useSheets();
   const createSheet = useCreateSheet();
   const deleteSheet = useDeleteSheet();
+  const deleteSheets = useDeleteSheets();
   const duplicateSheet = useDuplicateSheet();
   const updateSheet = useUpdateSheet();
   const reorderSheets = useReorderSheets();
@@ -60,11 +67,16 @@ export default function HomeScreen() {
   const [menuSheetId, setMenuSheetId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
   const [listData, setListData] = useState<WorkoutSheet[]>([]);
+  // Kept separate from selectedIds so selection mode can start empty.
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (sheets) setListData(sheets);
     else setListData([]);
   }, [sheets]);
+
+  const allSelected = listData.length > 0 && listData.every((s) => selectedIds.has(s.id));
 
   const handleCreate = () => {
     if (!newSheetName.trim()) return;
@@ -79,24 +91,65 @@ export default function HomeScreen() {
     );
   };
 
-  const handleDelete = (id: string, name: string) => {
-    const title = "Delete sheet";
-    const message = `Delete \"${name}\"? This cannot be undone.`;
+  const handleDelete = async (id: string, name: string) => {
+    const ok = await confirm({
+      title: "Delete sheet",
+      message: `Delete "${name}"? This cannot be undone.`,
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (ok) deleteSheet.mutate(id);
+  };
 
-    if (Platform.OS === "web") {
-      if (window.confirm(`${title}\n\n${message}`)) {
-        deleteSheet.mutate(id);
-      }
-    } else {
-      Alert.alert(title, message, [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => deleteSheet.mutate(id),
-        },
-      ]);
-    }
+  const enterSelection = () => {
+    setMenuSheetId(null);
+    setEditingSheetId(null);
+    setSelectionMode(true);
+  };
+
+  const exitSelection = () => {
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  };
+
+  const toggleSelected = (id: string) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (allSelected) listData.forEach((s) => next.delete(s.id));
+      else listData.forEach((s) => next.add(s.id));
+      return next;
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    // Resolve against the full list: a sheet can be selected and then hidden.
+    const targets = listData.filter((s) => selectedIds.has(s.id));
+    if (targets.length === 0) return;
+
+    const ok = await confirm({
+      title: `Delete ${targets.length} ${targets.length === 1 ? "sheet" : "sheets"}`,
+      message:
+        targets.length <= 5
+          ? `Delete ${targets.map((s) => `"${s.name}"`).join(", ")}? This cannot be undone.`
+          : `Delete ${targets.length} sheets? This cannot be undone.`,
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
+
+    deleteSheets.mutate(
+      targets.map((s) => s.id),
+      { onSuccess: exitSelection },
+    );
   };
 
   const beginRename = (item: WorkoutSheet) => {
@@ -152,17 +205,34 @@ export default function HomeScreen() {
   };
 
   const renderSheet = ({ item, drag, isActive }: RenderItemParams<WorkoutSheet>) => {
-    const isEditing = editingSheetId === item.id;
-    const isMenuOpen = menuSheetId === item.id;
+    const isEditing = !selectionMode && editingSheetId === item.id;
+    const isMenuOpen = !selectionMode && menuSheetId === item.id;
+    const isSelected = selectedIds.has(item.id);
 
     // The "open sheet" touchable wraps only the title block: the drag handle,
-    // the options button and the inline menu are siblings, so their presses
-    // never reach it (stopPropagation doesn't stop gesture-handler touchables).
+    // the checkbox, the options button and the inline menu are siblings, so
+    // their presses never reach it (stopPropagation doesn't stop
+    // gesture-handler touchables).
     return (
       <ScaleDecorator>
         <Card className={`w-full mb-3 ${isActive ? "opacity-90" : ""}`}>
           <View className="flex-row items-center">
-            {!isEditing ? (
+            {selectionMode ? (
+              // Same footprint as the drag handle so the row does not shift.
+              <GHTouchableOpacity
+                onPress={() => toggleSelected(item.id)}
+                className="mr-1 h-9 w-8 items-center justify-center"
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: isSelected }}
+                accessibilityLabel={`${isSelected ? "Deselect" : "Select"} ${item.name}`}
+              >
+                {isSelected ? (
+                  <CheckSquare size={ICON_SIZE} strokeWidth={ICON_STROKE} color="#22c55e" />
+                ) : (
+                  <Square size={ICON_SIZE} strokeWidth={ICON_STROKE} color="#7c8aa5" />
+                )}
+              </GHTouchableOpacity>
+            ) : !isEditing ? (
               <GHTouchableOpacity
                 onLongPress={drag}
                 delayLongPress={180}
@@ -203,34 +273,46 @@ export default function HomeScreen() {
                 <View className="flex-1 min-w-0">
                   <GHTouchableOpacity
                     className="w-full py-1"
-                    onPress={() => router.push(`/sheet/${item.id}`)}
-                    onLongPress={() => toggleSheetMenu(item)}
+                    onPress={
+                      selectionMode
+                        ? () => toggleSelected(item.id)
+                        : () => router.push(`/sheet/${item.id}`)
+                    }
+                    onLongPress={selectionMode ? undefined : () => toggleSheetMenu(item)}
                     delayLongPress={350}
                     activeOpacity={0.75}
                     accessibilityRole="button"
-                    accessibilityLabel={`Open ${item.name}`}
+                    accessibilityLabel={
+                      selectionMode
+                        ? `${isSelected ? "Deselect" : "Select"} ${item.name}`
+                        : `Open ${item.name}`
+                    }
                   >
                     <Text className="text-text-primary text-lg font-bold" numberOfLines={1}>
                       {item.name}
                     </Text>
-                    <Text className="text-text-muted text-xs mt-1">Tap to open workout plan</Text>
+                    <Text className="text-text-muted text-xs mt-1">
+                      {selectionMode ? "Tap to select" : "Tap to open workout plan"}
+                    </Text>
                   </GHTouchableOpacity>
                 </View>
 
-                <TouchableOpacity
-                  onPress={() => toggleSheetMenu(item)}
-                  className={`ml-2 h-9 w-9 items-center justify-center rounded-xl border ${
-                    isMenuOpen ? "bg-action-primary border-action-primary" : "bg-action-secondary border-border"
-                  }`}
-                  accessibilityLabel="Sheet options"
-                  accessibilityRole="button"
-                >
-                  <MoreHorizontal
-                    size={ICON_SIZE}
-                    strokeWidth={ICON_STROKE}
-                    color={isMenuOpen ? "#ffffff" : "#c0c9d8"}
-                  />
-                </TouchableOpacity>
+                {!selectionMode ? (
+                  <TouchableOpacity
+                    onPress={() => toggleSheetMenu(item)}
+                    className={`ml-2 h-9 w-9 items-center justify-center rounded-xl border ${
+                      isMenuOpen ? "bg-action-primary border-action-primary" : "bg-action-secondary border-border"
+                    }`}
+                    accessibilityLabel="Sheet options"
+                    accessibilityRole="button"
+                  >
+                    <MoreHorizontal
+                      size={ICON_SIZE}
+                      strokeWidth={ICON_STROKE}
+                      color={isMenuOpen ? "#ffffff" : "#c0c9d8"}
+                    />
+                  </TouchableOpacity>
+                ) : null}
               </>
             )}
           </View>
@@ -265,8 +347,30 @@ export default function HomeScreen() {
       <View className="px-5 pt-3 pb-2">
         <ScreenHeader
           title="My Sheets"
-          subtitle="Create your plan, drag to reorder, long-press for options."
+          subtitle={
+            selectionMode
+              ? "Pick the sheets you want to delete."
+              : "Create your plan, drag to reorder, long-press for options."
+          }
           icon={SquarePen}
+          rightAction={
+            listData.length > 0 ? (
+              <TouchableOpacity
+                onPress={selectionMode ? exitSelection : enterSelection}
+                className={`h-9 w-9 items-center justify-center rounded-xl border ${
+                  selectionMode ? "bg-action-primary border-action-primary" : "bg-action-secondary border-border"
+                }`}
+                accessibilityLabel={selectionMode ? "Cancel selection" : "Select sheets"}
+                accessibilityRole="button"
+              >
+                {selectionMode ? (
+                  <X size={ICON_SIZE} strokeWidth={ICON_STROKE} color="#ffffff" />
+                ) : (
+                  <ListChecks size={ICON_SIZE} strokeWidth={ICON_STROKE} color="#c0c9d8" />
+                )}
+              </TouchableOpacity>
+            ) : null
+          }
         />
 
         {activeSession ? (
@@ -342,11 +446,15 @@ export default function HomeScreen() {
               reorderSheets.mutate(data.map((s) => s.id));
             }
           }}
-          extraData={[editingSheetId, menuSheetId, renameDraft, updateSheet.isPending, reorderSheets.isPending, duplicateSheet.isPending]}
+          extraData={[editingSheetId, menuSheetId, renameDraft, updateSheet.isPending, reorderSheets.isPending, duplicateSheet.isPending, selectionMode, selectedIds]}
           // Without flex the wrapper takes its intrinsic height and the list
           // cannot scroll on web.
           containerStyle={{ flex: 1 }}
-          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 140 }}
+          contentContainerStyle={{
+            paddingHorizontal: 20,
+            paddingTop: 8,
+            paddingBottom: selectionMode ? 200 : 140,
+          }}
           ListEmptyComponent={
             <StateBlock
               title="No sheets yet"
@@ -359,7 +467,7 @@ export default function HomeScreen() {
         />
       )}
 
-      {showCreate ? (
+      {showCreate && !selectionMode ? (
         <View className="absolute bottom-24 left-5 right-5">
           <Card padding="lg" className="border border-border">
             <Text className="text-text-primary text-lg font-bold">Create a new sheet</Text>
@@ -396,15 +504,47 @@ export default function HomeScreen() {
         </View>
       ) : null}
 
-      <TouchableOpacity
-        className="absolute bottom-24 right-5 h-14 w-14 items-center justify-center rounded-full bg-action-primary border border-action-primary-press"
-        onPress={() => setShowCreate(true)}
-        accessibilityRole="button"
-        accessibilityLabel="Create a new sheet"
-        activeOpacity={0.85}
-      >
-        <Plus size={22} strokeWidth={2.4} color="#ffffff" />
-      </TouchableOpacity>
+      {!selectionMode ? (
+        <TouchableOpacity
+          className="absolute bottom-24 right-5 h-14 w-14 items-center justify-center rounded-full bg-action-primary border border-action-primary-press"
+          onPress={() => setShowCreate(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Create a new sheet"
+          activeOpacity={0.85}
+        >
+          <Plus size={22} strokeWidth={2.4} color="#ffffff" />
+        </TouchableOpacity>
+      ) : null}
+
+      {/* The bar owns the bottom edge while selecting: the FAB and the create
+          popover sit at bottom-24 and are hidden for the duration. */}
+      {selectionMode ? (
+        <SafeAreaView className="absolute bottom-0 left-0 right-0" edges={["bottom"]}>
+          <Card variant="muted" className="rounded-b-none border-t border-border">
+            <View className="flex-row items-center">
+              <Text className="flex-1 text-text-primary text-sm font-semibold">
+                {selectedIds.size} selected
+              </Text>
+              <Button
+                label={allSelected ? "Deselect all" : "Select all"}
+                variant="ghost"
+                size="sm"
+                onPress={toggleSelectAll}
+              />
+              <Button
+                label="Delete"
+                icon={Trash2}
+                variant="danger"
+                size="sm"
+                className="ml-2"
+                disabled={selectedIds.size === 0}
+                loading={deleteSheets.isPending}
+                onPress={handleBulkDelete}
+              />
+            </View>
+          </Card>
+        </SafeAreaView>
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -444,16 +584,12 @@ function formatStartedAt(startedAt: string): string {
   return hours === 1 ? "1 hour ago" : `${hours} hours ago`;
 }
 
-function confirmDiscard(sheetName: string, onConfirm: () => void) {
-  const title = "Discard workout";
-  const message = `Stop the workout in progress on "${sheetName}"? Sets you already marked as done are kept in your history.`;
-
-  if (Platform.OS === "web") {
-    if (window.confirm(`${title}\n\n${message}`)) onConfirm();
-  } else {
-    Alert.alert(title, message, [
-      { text: "Cancel", style: "cancel" },
-      { text: "Discard", style: "destructive", onPress: onConfirm },
-    ]);
-  }
+async function confirmDiscard(sheetName: string, onConfirm: () => void) {
+  const ok = await confirm({
+    title: "Discard workout",
+    message: `Stop the workout in progress on "${sheetName}"? Sets you already marked as done are kept in your history.`,
+    confirmLabel: "Discard",
+    destructive: true,
+  });
+  if (ok) onConfirm();
 }

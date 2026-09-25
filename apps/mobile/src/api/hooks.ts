@@ -56,7 +56,23 @@ export function useDeleteSheet() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.sheets.delete(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["sheets"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["sheets"] });
+      // The DB cascade removes the sheet's sessions too.
+      qc.invalidateQueries({ queryKey: ["sessions"] });
+    },
+  });
+}
+
+export function useDeleteSheets() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: string[]) => api.sheets.deleteMany(ids),
+    onSuccess: (_, ids) => {
+      qc.invalidateQueries({ queryKey: ["sheets"] });
+      ids.forEach((id) => qc.removeQueries({ queryKey: ["sheets", id] }));
+      qc.invalidateQueries({ queryKey: ["sessions"] });
+    },
   });
 }
 
