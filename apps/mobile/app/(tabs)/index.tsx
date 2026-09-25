@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Platform, Text, TouchableOpacity, View } from "react-native";
+import { Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import {
@@ -36,7 +36,7 @@ import {
   useSheets,
   useUpdateSheet,
 } from "../../src/api/hooks";
-import { confirm } from "../../src/lib/confirm";
+import { confirm, notify } from "../../src/lib/confirm";
 import {
   Button,
   Card,
@@ -181,12 +181,7 @@ export default function HomeScreen() {
     setMenuSheetId(null);
     duplicateSheet.mutate(item.id, {
       onError: (err) => {
-        const msg = err instanceof Error ? err.message : "Could not duplicate sheet";
-        if (Platform.OS === "web") {
-          window.alert(msg);
-        } else {
-          Alert.alert("Duplicate failed", msg);
-        }
+        notify("Duplicate failed", err instanceof Error ? err.message : "Could not duplicate sheet");
       },
     });
   };
@@ -212,12 +207,7 @@ export default function HomeScreen() {
       {
         onSuccess: () => setEditingSheetId(null),
         onError: (err) => {
-          const msg = err instanceof Error ? err.message : "Could not rename sheet";
-          if (Platform.OS === "web") {
-            window.alert(msg);
-          } else {
-            Alert.alert("Rename failed", msg);
-          }
+          notify("Rename failed", err instanceof Error ? err.message : "Could not rename sheet");
         },
       },
     );
@@ -265,6 +255,10 @@ export default function HomeScreen() {
               >
                 <GripVertical size={ICON_SIZE} strokeWidth={ICON_STROKE} color="#7c8aa5" />
               </GHTouchableOpacity>
+            ) : isSearching && !isEditing ? (
+              // Hold the handle's footprint so titles stay aligned while the
+              // list is filtered and dragging is off.
+              <View className="mr-1 h-9 w-8" />
             ) : null}
 
             {isEditing ? (
@@ -490,10 +484,13 @@ export default function HomeScreen() {
           keyExtractor={(item) => item.id}
           renderItem={renderSheet}
           onDragEnd={({ data, from, to }) => {
+            // The handle is not rendered while selecting or searching, so this
+            // cannot normally fire then — but `data` would be the filtered
+            // subset, and reorder rewrites order_index for exactly the ids it
+            // is given, so guard the write path too.
+            if (selectionMode || isSearching || from === to) return;
             setListData(data);
-            if (from !== to) {
-              reorderSheets.mutate(data.map((s) => s.id));
-            }
+            reorderSheets.mutate(data.map((s) => s.id));
           }}
           extraData={[editingSheetId, menuSheetId, renameDraft, updateSheet.isPending, reorderSheets.isPending, duplicateSheet.isPending, selectionMode, selectedIds, query]}
           // Without flex the wrapper takes its intrinsic height and the list

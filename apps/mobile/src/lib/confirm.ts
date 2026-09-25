@@ -20,13 +20,20 @@ export function confirm(opts: {
     return Promise.resolve(window.confirm(`${title}\n\n${message}`));
   }
   return new Promise((resolve) => {
-    Alert.alert(title, message, [
-      { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
-      {
-        text: confirmLabel,
-        style: destructive ? "destructive" : "default",
-        onPress: () => resolve(true),
-      },
-    ]);
+    Alert.alert(
+      title,
+      message,
+      [
+        { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
+        {
+          text: confirmLabel,
+          style: destructive ? "destructive" : "default",
+          onPress: () => resolve(true),
+        },
+      ],
+      // Android's back button dismisses the alert without firing any button;
+      // without onDismiss the promise would never settle.
+      { onDismiss: () => resolve(false) },
+    );
   });
 }
