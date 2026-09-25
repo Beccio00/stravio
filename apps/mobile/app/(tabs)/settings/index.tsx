@@ -18,13 +18,12 @@ import {
   Upload,
   User,
 } from "lucide-react-native";
-import { useQueryClient } from "@tanstack/react-query";
 import { Card, ICON_STROKE, ProgressBar, ScreenHeader, StateBlock } from "../../../src/components/ui";
 import { useAuth } from "../../../src/contexts/AuthContext";
 import { usePreferences, type ThemePreference } from "../../../src/contexts/PreferencesContext";
 import * as notifications from "../../../src/lib/notifications";
 import { prefs } from "../../../src/lib/preferences";
-import { useSheets } from "../../../src/api/hooks";
+import { useImportSheets, useSheets } from "../../../src/api/hooks";
 import { api } from "../../../src/api/client";
 import { exportCSV, exportJSON, exportPDF, pickAndParseFile } from "../../../src/lib/sheetsIO";
 import {
@@ -192,7 +191,7 @@ export default function SettingsScreen() {
   const { theme, setTheme } = usePreferences();
   const { user, signOut } = useAuth();
   const { data: sheets } = useSheets();
-  const queryClient = useQueryClient();
+  const importSheets = useImportSheets();
   const [exportBusy, setExportBusy] = useState(false);
   const [importBusy, setImportBusy] = useState(false);
   const [importProgress, setImportProgress] = useState<IOProgress | null>(null);
@@ -315,8 +314,7 @@ export default function SettingsScreen() {
         return;
       }
 
-      await api.sheets.import(parsed, onProgress);
-      await queryClient.invalidateQueries({ queryKey: ["sheets"] });
+      await importSheets.mutateAsync({ sheets: parsed, onProgress });
       notify("Import complete", `${parsed.length} ${noun} imported.`);
     } catch (err) {
       setImportProgress((prev) => ({
@@ -329,7 +327,7 @@ export default function SettingsScreen() {
     } finally {
       setImportBusy(false);
     }
-  }, [importBusy, queryClient]);
+  }, [importBusy, importSheets]);
 
   const handleToggle = async (value: boolean) => {
     setEnabled(value);
