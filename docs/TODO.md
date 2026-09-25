@@ -8,6 +8,8 @@
 - [ ] **New Architecture** – Expo Go always runs the New Architecture while `app.json` has `newArchEnabled: false` (APK = old arch). This is why Expo Go and the APK can behave differently; always smoke-test on the APK. Evaluate switching to `newArchEnabled: true` once `react-native-draggable-flatlist`/reanimated warnings are sorted out.
 - [ ] **Draggable list warnings** – `react-native-draggable-flatlist` logs "GestureDetector has received a child that may get view-flattened" and Reanimated "Tried to modify key `current`" under the New Architecture (Expo Go). Harmless for now; wrap row content in `<View collapsable={false}>` or upgrade the library.
 - [ ] **Web console warning** – `findDOMNode is deprecated` from react-native-web in `(tabs)/_layout.tsx` on web. Cosmetic.
+- [ ] **Import is not atomic** – `api.sheets.import` runs `2 + S + 2E` sequential inserts with no transaction, so a failure part-way leaves rows behind; the client now deletes what it wrote, but a dropped connection defeats the cleanup too (the error message says how many sheets were left). Replace with a `security definer` Postgres RPC taking the payload as one `jsonb` argument and doing sheets → exercises → sets in one transaction. That makes it atomic *and* collapses hundreds of round-trips into one. Needs a migration in `supabase/schema.sql`; `ImportedSheet[]` is already the right payload shape.
+- [ ] **Export fan-out is unbounded** – `handleExport` fires `api.sheets.get()` for every sheet in one `Promise.all`, and each `get` is itself `1 + 1 + N` queries. Add a concurrency limit of about four before anyone has fifty sheets.
 
 
 ## BACKLOG
@@ -29,6 +31,9 @@
 
 ## Done
 
+- [x] **Import / export progress** – A real progress bar both ways: the percentage follows completed round-trips under a per-phase weighting (writing is 90%), the file size is shown as a label, and the bar turns green when the work is actually done (v1.3.0).
+- [x] **Import size limit and rollback** – Imports are refused above 8 MB before the file is read, and a failed import deletes the sheets it had already written (v1.3.0).
+- [x] **Import / export busy-state bugs** – The web file picker resolves when dismissed instead of leaving the row disabled forever, export stops showing busy once the file is written rather than once the share sheet closes, and a blocked PDF pop-up reports an error instead of failing silently (v1.3.0).
 - [x] **Real Android notifications** – `expo-notifications` with a daily reminder and a monochrome status-bar icon (v1.2.0).
 - [x] **Resume an in-progress workout** – Cached locally and restored from the server, with Resume/Discard entry points and auto-close after 6h (v1.2.0).
 - [x] **Session notes** – Shown in the history detail and synced back to the sheet template on finish (v1.2.0).
