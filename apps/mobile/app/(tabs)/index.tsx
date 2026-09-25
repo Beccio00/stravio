@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Alert, Platform, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -13,6 +13,7 @@ import {
   PencilLine,
   Play,
   Plus,
+  Search,
   Square,
   SquarePen,
   Trash2,
@@ -48,6 +49,9 @@ import {
 
 cssInterop(GHTouchableOpacity, { className: "style" });
 
+/** Below this many sheets the whole list fits on screen and search is noise. */
+const SEARCH_MIN_SHEETS = 5;
+
 export default function HomeScreen() {
   const router = useRouter();
   const { data: sheets, isLoading, error } = useSheets();
@@ -70,13 +74,28 @@ export default function HomeScreen() {
   // Kept separate from selectedIds so selection mode can start empty.
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     if (sheets) setListData(sheets);
     else setListData([]);
   }, [sheets]);
 
-  const allSelected = listData.length > 0 && listData.every((s) => selectedIds.has(s.id));
+  const isSearching = query.trim().length > 0;
+
+  // Derived from listData, not from sheets: a drag mutates listData first and
+  // the list would snap back to the server order on every keystroke.
+  const filtered = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return listData;
+    return listData.filter(
+      (s) =>
+        s.name.toLowerCase().includes(needle) ||
+        (s.description ?? "").toLowerCase().includes(needle),
+    );
+  }, [listData, query]);
+
+  const allSelected = filtered.length > 0 && filtered.every((s) => selectedIds.has(s.id));
 
   const handleCreate = () => {
     if (!newSheetName.trim()) return;
@@ -124,8 +143,8 @@ export default function HomeScreen() {
   const toggleSelectAll = () => {
     setSelectedIds((current) => {
       const next = new Set(current);
-      if (allSelected) listData.forEach((s) => next.delete(s.id));
-      else listData.forEach((s) => next.add(s.id));
+      if (allSelected) filtered.forEach((s) => next.delete(s.id));
+      else filtered.forEach((s) => next.add(s.id));
       return next;
     });
   };
@@ -208,6 +227,9 @@ export default function HomeScreen() {
     const isEditing = !selectionMode && editingSheetId === item.id;
     const isMenuOpen = !selectionMode && menuSheetId === item.id;
     const isSelected = selectedIds.has(item.id);
+    // Reorder rewrites order_index for the ids it is given, so a drag on a
+    // filtered list would reindex the whole collection.
+    const canDrag = !selectionMode && !isSearching;
 
     // The "open sheet" touchable wraps only the title block: the drag handle,
     // the checkbox, the options button and the inline menu are siblings, so
@@ -232,7 +254,7 @@ export default function HomeScreen() {
                   <Square size={ICON_SIZE} strokeWidth={ICON_STROKE} color="#7c8aa5" />
                 )}
               </GHTouchableOpacity>
-            ) : !isEditing ? (
+            ) : canDrag && !isEditing ? (
               <GHTouchableOpacity
                 onLongPress={drag}
                 delayLongPress={180}
@@ -350,7 +372,9 @@ export default function HomeScreen() {
           subtitle={
             selectionMode
               ? "Pick the sheets you want to delete."
-              : "Create your plan, drag to reorder, long-press for options."
+              : isSearching
+                ? "Showing matches only — clear the search to reorder."
+                : "Create your plan, drag to reorder, long-press for options."
           }
           icon={SquarePen}
           rightAction={
@@ -372,6 +396,31 @@ export default function HomeScreen() {
             ) : null
           }
         />
+
+        {listData.length > SEARCH_MIN_SHEETS ? (
+          <View className="mt-4 flex-row items-center">
+            <Input
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Search sheets"
+              leftIcon={Search}
+              autoCorrect={false}
+              autoCapitalize="none"
+              returnKeyType="search"
+              containerClassName="flex-1"
+            />
+            {isSearching ? (
+              <TouchableOpacity
+                onPress={() => setQuery("")}
+                className="ml-2 h-9 w-9 items-center justify-center rounded-xl bg-action-secondary border border-border"
+                accessibilityLabel="Clear search"
+                accessibilityRole="button"
+              >
+                <X size={ICON_SIZE} strokeWidth={ICON_STROKE} color="#c0c9d8" />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        ) : null}
 
         {activeSession ? (
           <Card className="mt-4" padding="md">
@@ -437,7 +486,7 @@ export default function HomeScreen() {
         </View>
       ) : (
         <DraggableFlatList
-          data={listData}
+          data={filtered}
           keyExtractor={(item) => item.id}
           renderItem={renderSheet}
           onDragEnd={({ data, from, to }) => {
@@ -446,7 +495,7 @@ export default function HomeScreen() {
               reorderSheets.mutate(data.map((s) => s.id));
             }
           }}
-          extraData={[editingSheetId, menuSheetId, renameDraft, updateSheet.isPending, reorderSheets.isPending, duplicateSheet.isPending, selectionMode, selectedIds]}
+          extraData={[editingSheetId, menuSheetId, renameDraft, updateSheet.isPending, reorderSheets.isPending, duplicateSheet.isPending, selectionMode, selectedIds, query]}
           // Without flex the wrapper takes its intrinsic height and the list
           // cannot scroll on web.
           containerStyle={{ flex: 1 }}
@@ -456,13 +505,23 @@ export default function HomeScreen() {
             paddingBottom: selectionMode ? 200 : 140,
           }}
           ListEmptyComponent={
-            <StateBlock
-              title="No sheets yet"
-              description="Create your first sheet to start planning workouts."
-              actionLabel="Create sheet"
-              onAction={() => setShowCreate(true)}
-              className="mt-8"
-            />
+            isSearching ? (
+              <StateBlock
+                title="No sheets match"
+                description={`Nothing found for "${query.trim()}".`}
+                actionLabel="Clear search"
+                onAction={() => setQuery("")}
+                className="mt-8"
+              />
+            ) : (
+              <StateBlock
+                title="No sheets yet"
+                description="Create your first sheet to start planning workouts."
+                actionLabel="Create sheet"
+                onAction={() => setShowCreate(true)}
+                className="mt-8"
+              />
+            )
           }
         />
       )}
