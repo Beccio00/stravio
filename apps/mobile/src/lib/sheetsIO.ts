@@ -16,6 +16,7 @@ import * as Sharing from "expo-sharing";
 import * as DocumentPicker from "expo-document-picker";
 import type { WorkoutSheetFull } from "@bhmt3wp/shared";
 import {
+  EXPORT_PHASE_WEIGHTS,
   IMPORT_PHASE_WEIGHTS,
   formatBytes,
   phaseRatio,
@@ -76,6 +77,36 @@ function emitImport(
   extra?: Omit<IOProgress, "phase" | "ratio">,
 ): void {
   onProgress?.({ phase, ratio: phaseRatio(IMPORT_PHASE_WEIGHTS, phase, fraction), ...extra });
+}
+
+/** Emits an export-weighted tick. */
+function emitExport(
+  onProgress: IOProgressFn | undefined,
+  phase: IOPhase,
+  fraction: number,
+  extra?: Omit<IOProgress, "phase" | "ratio">,
+): void {
+  onProgress?.({ phase, ratio: phaseRatio(EXPORT_PHASE_WEIGHTS, phase, fraction), ...extra });
+}
+
+/**
+ * UTF-8 byte length of a string, without allocating a Blob or Buffer so it
+ * behaves the same on web and on device. `string.length` counts UTF-16 units,
+ * which undercounts every accented character in a sheet name.
+ */
+function utf8Bytes(text: string): number {
+  let n = 0;
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i);
+    if (code < 0x80) n += 1;
+    else if (code < 0x800) n += 2;
+    else if (code >= 0xd800 && code <= 0xdbff) {
+      // Surrogate pair: 4 bytes, and the low surrogate is consumed here.
+      n += 4;
+      i++;
+    } else n += 3;
+  }
+  return n;
 }
 
 function assertImportSize(bytes: number | undefined, filename: string): void {
@@ -459,18 +490,27 @@ async function shareOnNative(
   content: string,
   filename: string,
   mimeType: string,
+  onWritten?: () => void,
 ): Promise<void> {
   const path = `${FileSystem.cacheDirectory}${filename}`;
   await FileSystem.writeAsStringAsync(path, content, {
     encoding: FileSystem.EncodingType.UTF8,
   });
+  // The work is finished here. Everything after this waits on the user.
+  onWritten?.();
 
+  await shareFile(path, mimeType, `Export ${filename}`);
+}
+
+async function shareFile(path: string, mimeType: string, dialogTitle: string): Promise<void> {
   const isAvailable = await Sharing.isAvailableAsync();
   if (!isAvailable) {
     Alert.alert("Sharing not available", "Sharing is not supported on this device.");
     return;
   }
-  await Sharing.shareAsync(path, { mimeType, dialogTitle: `Export ${filename}` });
+  // `shareAsync` resolves when the OS sheet is DISMISSED, not when the export
+  // finished — which is exactly why the caller marks the export done before it.
+  await Sharing.shareAsync(path, { mimeType, dialogTitle });
 }
 
 function downloadOnWeb(content: string, filename: string, mimeType: string): void {
@@ -487,49 +527,105 @@ function downloadOnWeb(content: string, filename: string, mimeType: string): voi
 // Public export functions
 // ---------------------------------------------------------------------------
 
-export async function exportJSON(sheets: WorkoutSheetFull[]): Promise<void> {
-  const content = sheetsToJSON(sheets);
-  const filename = `stravio-sheets-${dateSlug()}.json`;
+/**
+ * Serialises, writes and shares one text export.
+ *
+ * The caller has already reported the "reading" phase (fetching every sheet),
+ * which is the slow part; what is left is milliseconds of serialisation plus the
+ * file write, so the bar is green before the share sheet even opens.
+ */
+async function exportText(
+  sheets: WorkoutSheetFull[],
+  serialize: (s: WorkoutSheetFull[]) => string,
+  extension: "json" | "csv",
+  mimeType: string,
+  onProgress?: IOProgressFn,
+): Promise<void> {
+  emitExport(onProgress, "parsing", 0, { message: `Building ${extension.toUpperCase()}…` });
+  const content = serialize(sheets);
+  // The byte count only becomes knowable once the payload exists.
+  const bytes = utf8Bytes(content);
+  emitExport(onProgress, "parsing", 1, { bytes });
+
+  const filename = `stravio-sheets-${dateSlug()}.${extension}`;
+  emitExport(onProgress, "writing", 0, { bytes });
+
   if (Platform.OS === "web") {
-    downloadOnWeb(content, filename, "application/json");
-  } else {
-    await shareOnNative(content, filename, "application/json");
+    downloadOnWeb(content, filename, mimeType);
+    emitExport(onProgress, "done", 1, { bytes, message: "Downloaded" });
+    return;
   }
+
+  await shareOnNative(content, filename, mimeType, () => {
+    emitExport(onProgress, "done", 1, { bytes, message: "File ready" });
+    emitExport(onProgress, "sharing", 1, { bytes, message: "Choose where to send it" });
+  });
+  emitExport(onProgress, "done", 1, { bytes, message: "Export complete" });
 }
 
-export async function exportCSV(sheets: WorkoutSheetFull[]): Promise<void> {
-  const content = sheetsToCSV(sheets);
-  const filename = `stravio-sheets-${dateSlug()}.csv`;
-  if (Platform.OS === "web") {
-    downloadOnWeb(content, filename, "text/csv");
-  } else {
-    await shareOnNative(content, filename, "text/csv");
-  }
+export async function exportJSON(
+  sheets: WorkoutSheetFull[],
+  onProgress?: IOProgressFn,
+): Promise<void> {
+  await exportText(sheets, sheetsToJSON, "json", "application/json", onProgress);
 }
 
-export async function exportPDF(sheets: WorkoutSheetFull[]): Promise<void> {
+export async function exportCSV(
+  sheets: WorkoutSheetFull[],
+  onProgress?: IOProgressFn,
+): Promise<void> {
+  await exportText(sheets, sheetsToCSV, "csv", "text/csv", onProgress);
+}
+
+export async function exportPDF(
+  sheets: WorkoutSheetFull[],
+  onProgress?: IOProgressFn,
+): Promise<void> {
+  emitExport(onProgress, "parsing", 0, { message: "Preparing PDF…" });
   const html = sheetsToHTML(sheets);
 
   if (Platform.OS === "web") {
+    const htmlBytes = utf8Bytes(html);
+    emitExport(onProgress, "parsing", 1, { bytes: htmlBytes });
+    emitExport(onProgress, "writing", 0, { bytes: htmlBytes });
+
     const win = window.open("", "_blank");
-    if (win) {
-      win.document.write(html);
-      win.document.close();
-      win.print();
+    // Used to fail silently when the browser blocked the pop-up: the row simply
+    // un-greyed and nothing happened.
+    if (!win) {
+      throw new Error(
+        "The browser blocked the print window. Allow pop-ups for this site and export again.",
+      );
     }
+    win.document.write(html);
+    win.document.close();
+    win.print();
+    emitExport(onProgress, "done", 1, { bytes: htmlBytes, message: "Print window opened" });
     return;
   }
 
+  // `expo-print` is a lazy chunk: the first import of the session is a visible
+  // pause, so it lives inside a reported phase rather than a frozen row.
   const Print = await import("expo-print");
+  emitExport(onProgress, "parsing", 1, { message: "Rendering PDF…" });
+
+  emitExport(onProgress, "writing", 0, { message: "Rendering PDF…" });
   const { uri } = await Print.printToFileAsync({ html });
 
-  const isAvailable = await Sharing.isAvailableAsync();
-  if (!isAvailable) {
-    Alert.alert("Sharing not available", "Sharing is not supported on this device.");
-    return;
+  let bytes: number | undefined;
+  try {
+    const info = await FileSystem.getInfoAsync(uri);
+    if (info.exists && !info.isDirectory) bytes = info.size;
+  } catch {
+    // Size is a nicety, never a reason to fail an export that already worked.
   }
+
+  emitExport(onProgress, "done", 1, { bytes, message: "File ready" });
+  emitExport(onProgress, "sharing", 1, { bytes, message: "Choose where to send it" });
+
   const pdfFilename = `stravio-sheets-${dateSlug()}.pdf`;
-  await Sharing.shareAsync(uri, { mimeType: "application/pdf", dialogTitle: pdfFilename });
+  await shareFile(uri, "application/pdf", pdfFilename);
+  emitExport(onProgress, "done", 1, { bytes, message: "Export complete" });
 }
 
 // ---------------------------------------------------------------------------
