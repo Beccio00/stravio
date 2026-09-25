@@ -154,7 +154,7 @@ Role is kept in schema to avoid breaking existing data and to support future mul
 **Cons**:
 - A native dependency: the rest timer cannot be tested in Expo Go, and shipping it needs `eas build`, not an OTA update.
 - Upstream `invertase/notifee` is archived; `9.1.8` (2024-12-20) is the last release, hence the exact pin. It is RN 0.76-era code and will have to be revisited before `newArchEnabled: true` (tracked in `docs/TODO.md`).
-- `npx expo-doctor` now reports `Unmaintained: @notifee/react-native` in the React Native Directory check. Left unsuppressed on purpose, so the archived dependency stays visible.
+- `npx expo-doctor` reports `Unmaintained: @notifee/react-native` in the React Native Directory check. That check is otherwise useful, so notifee is listed in `expo.doctor.reactNativeDirectoryCheck.exclude` rather than letting the doctor job fail on every future pull request; the archived dependency stays visible in `docs/TODO.md` instead.
 - Android channel importance and sound are immutable once created on a device, so the channel ids carry a `-v1` suffix that must be bumped to change either.
 
 ---
@@ -163,5 +163,5 @@ Role is kept in schema to avoid breaking existing data and to support future mul
 
 - **PowerSync**: Offline-first sync between local SQLite and Supabase
 - **Multi-role model**: Re-introduce role-specific flows only when assignment and permissions are fully designed
-- **Push notifications**: Workout reminders via Expo notifications
-- **Data export**: CSV/PDF export of workout history
+- **Transactional import**: Move `api.sheets.import` into a Postgres RPC so a partial import rolls back in the database instead of being undone from the client
+- **Workout history export**: CSV/PDF export of *sessions*. Sheet export shipped in v1.2.0 (`src/lib/sheetsIO.ts`); history is still unexported.
