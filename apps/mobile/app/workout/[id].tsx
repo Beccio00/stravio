@@ -269,13 +269,14 @@ export default function WorkoutScreen() {
     return () => sub.remove();
   }, [clearRestState]);
 
-  // Leaving the screen ends the rest: nothing should keep ticking in the shade
-  // for a workout the user is no longer looking at.
-  useEffect(() => {
-    return () => {
-      void cancelRestNotifications();
-    };
-  }, []);
+  // Navigating away deliberately does NOT stop the rest. Being away from the
+  // screen is exactly when the notification earns its keep, and the deadline
+  // stays in the cache, so the two agree: both live until the rest ends, until
+  // Skip, or until the workout is finished. Nothing leaks either — `timeoutAfter`
+  // makes Android drop the notification at the deadline on its own.
+  //
+  // Cancelling here instead would leave the cached deadline behind, so coming
+  // back would show a countdown with no notification and no bell.
 
   const getEditValue = (exerciseId: string, setNumber: number) => {
     const key = `${exerciseId}-${setNumber}`;
