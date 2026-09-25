@@ -8,6 +8,8 @@
 - [ ] **New Architecture** – Expo Go always runs the New Architecture while `app.json` has `newArchEnabled: false` (APK = old arch). This is why Expo Go and the APK can behave differently; always smoke-test on the APK. Evaluate switching to `newArchEnabled: true` once `react-native-draggable-flatlist`/reanimated warnings are sorted out.
 - [ ] **Draggable list warnings** – `react-native-draggable-flatlist` logs "GestureDetector has received a child that may get view-flattened" and Reanimated "Tried to modify key `current`" under the New Architecture (Expo Go). Harmless for now; wrap row content in `<View collapsable={false}>` or upgrade the library.
 - [ ] **Web console warning** – `findDOMNode is deprecated` from react-native-web in `(tabs)/_layout.tsx` on web. Cosmetic.
+- [ ] **Hardware back should leave selection mode** – On Android, pressing back while sheets are selected leaves the tab instead of clearing the selection. Needs a `BackHandler` listener; the app has none today.
+- [ ] **Bulk delete is not atomic** – `api.sheets.deleteMany` is a single `.in("id", ids)` delete, so it is atomic server-side today, but PostgREST puts the ids in the URL: past a few hundred sheets it will need chunking, and chunk 2 failing would leave chunk 1 deleted.
 
 
 ## BACKLOG
@@ -29,6 +31,9 @@
 
 ## Done
 
+- [x] **Bulk select and delete sheets** – Selection mode from the Home header, select all, and one delete for the lot; the cascaded sessions are dropped from the query cache too (v1.3.0).
+- [x] **Search sheets** – Filter Home by name or description, shown above five sheets; drag-to-reorder pauses while filtering because reorder rewrites `order_index` for exactly the ids it is given (v1.3.0).
+- [x] **Shared confirm dialog** – One promise-based `confirm()` / `notify()` in `src/lib/confirm.ts`, replacing the duplicated `Platform.OS === "web"` branches (v1.3.0).
 - [x] **Real Android notifications** – `expo-notifications` with a daily reminder and a monochrome status-bar icon (v1.2.0).
 - [x] **Resume an in-progress workout** – Cached locally and restored from the server, with Resume/Discard entry points and auto-close after 6h (v1.2.0).
 - [x] **Session notes** – Shown in the history detail and synced back to the sheet template on finish (v1.2.0).
