@@ -10,6 +10,30 @@ const NOTIF_ID_KEY = "notif_id";
 // expo-notifications cannot schedule on web.
 const isWeb = Platform.OS === "web";
 
+// Channel ids are versioned because Android freezes a channel's importance,
+// sound and vibration the first time it is created on a device: changing any
+// of them later is only possible under a NEW id. To change importance or
+// sound, bump the `-vN` suffix — never the human-readable name.
+export const REST_CHANNEL_ID = "rest-timer-v1";
+export const REST_DONE_CHANNEL_ID = "rest-done-v1";
+
+// Without a handler, expo-notifications silently swallows any notification
+// that arrives while the app is in the foreground — which is why the daily
+// reminder was invisible when the app happened to be open.
+if (!isWeb) {
+  try {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+      }),
+    });
+  } catch {
+    // Native module unavailable (e.g. an unsupported runtime) — ignore.
+  }
+}
+
 export async function requestPermission(): Promise<boolean> {
   if (isWeb) return false;
   try {
@@ -70,6 +94,25 @@ export async function init(): Promise<void> {
       await Notifications.setNotificationChannelAsync("default", {
         name: "Default",
         importance: Notifications.AndroidImportance.DEFAULT,
+      });
+
+      // The ongoing rest countdown. LOW keeps it silent and out of the
+      // heads-up banner area: it is a status readout, not an alert.
+      await Notifications.setNotificationChannelAsync(REST_CHANNEL_ID, {
+        name: "Rest timer",
+        importance: Notifications.AndroidImportance.LOW,
+        sound: null,
+        vibrationPattern: null,
+        enableVibrate: false,
+      });
+
+      // The bell at zero. DEFAULT plays the sound without raising a heads-up
+      // banner, which is exactly "a sound, not a real notification".
+      // `bell` is the res/raw resource name, without the extension.
+      await Notifications.setNotificationChannelAsync(REST_DONE_CHANNEL_ID, {
+        name: "Rest timer finished",
+        importance: Notifications.AndroidImportance.DEFAULT,
+        sound: "bell",
       });
     }
     const stored = await SecureStore.getItemAsync(PREF_KEY);
