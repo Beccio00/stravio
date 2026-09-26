@@ -22,7 +22,14 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0881f2"
       },
-      "package": "com.bhmt3wp.stravio"
+      "package": "com.bhmt3wp.stravio",
+      "permissions": [
+        "POST_NOTIFICATIONS",
+        "SCHEDULE_EXACT_ALARM",
+        "USE_EXACT_ALARM",
+        "VIBRATE",
+        "WAKE_LOCK"
+      ]
     },
     "androidStatusBar": {
       "barStyle": "light-content",
@@ -50,7 +57,8 @@
         "expo-notifications",
         {
           "icon": "./assets/notification-icon.png",
-          "color": "#3b82f6"
+          "color": "#3b82f6",
+          "sounds": ["./assets/bell.wav"]
         }
       ],
       "expo-document-picker"

@@ -4,6 +4,11 @@ export interface SavedSessionState {
   completedSets: string[]; // serialized Set<string>
   editValues: Record<string, { kg: string; reps: string }>;
   notes: Record<string, string>;
+  /**
+   * Wall-clock instant, in ms, at which the running rest ends. Optional so
+   * payloads written before this field existed still parse.
+   */
+  restEndsAt?: number | null;
   updatedAt: number;
 }
 
@@ -26,6 +31,23 @@ export async function loadSessionState(
   } catch {
     return null;
   }
+}
+
+/**
+ * Write the rest deadline on its own, without waiting for the debounced save
+ * of the rest of the session state. A deadline that lands 300 ms late is
+ * worthless if the app is backgrounded or killed in between, so this one field
+ * is merged into the cached payload immediately.
+ */
+export async function saveRestEndsAt(id: string, restEndsAt: number | null): Promise<void> {
+  const current = await loadSessionState(id);
+  await saveSessionState(id, {
+    completedSets: current?.completedSets ?? [],
+    editValues: current?.editValues ?? {},
+    notes: current?.notes ?? {},
+    restEndsAt,
+    updatedAt: Date.now(),
+  });
 }
 
 export async function clearSessionState(id: string): Promise<void> {
