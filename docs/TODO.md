@@ -8,6 +8,7 @@
 - [ ] **New Architecture** – Expo Go always runs the New Architecture while `app.json` has `newArchEnabled: false` (APK = old arch). This is why Expo Go and the APK can behave differently; always smoke-test on the APK. Evaluate switching to `newArchEnabled: true` once `react-native-draggable-flatlist`/reanimated warnings are sorted out.
 - [ ] **Draggable list warnings** – `react-native-draggable-flatlist` logs "GestureDetector has received a child that may get view-flattened" and Reanimated "Tried to modify key `current`" under the New Architecture (Expo Go). Harmless for now; wrap row content in `<View collapsable={false}>` or upgrade the library.
 - [ ] **Web console warning** – `findDOMNode is deprecated` from react-native-web in `(tabs)/_layout.tsx` on web. Cosmetic.
+- [ ] **notifee is archived** – The background rest timer depends on `@notifee/react-native`, pinned to exactly `9.1.8` (2024-12-20, the last release: upstream `invertase/notifee` is archived on GitHub). This pins us to RN 0.76-era behaviour, `npx expo-doctor` flags it as `Unmaintained` so it is listed under `expo.doctor.reactNativeDirectoryCheck.exclude` in `apps/mobile/package.json` to keep CI honest about everything else, and it blocks the **New Architecture** item above — check notifee under the New Architecture, or find a replacement, before flipping `newArchEnabled: true`. See D009.
 
 
 ## BACKLOG
