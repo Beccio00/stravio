@@ -8,6 +8,7 @@
 
 import { supabase } from "../lib/supabase";
 import type { ImportedSheet } from "../lib/sheetsIO";
+import { IMPORT_PHASE_WEIGHTS, phaseRatio, type IOProgressFn } from "../lib/ioProgress";
 import type {
   WorkoutSheet,
   WorkoutSheetFull,
@@ -260,54 +261,117 @@ export const api = {
     },
 
     /** Adds sheets (with exercises and sets) from an imported file; existing sheets are untouched. */
-    import: async (sheets: ImportedSheet[]): Promise<void> => {
+    /**
+     * Writes imported sheets one row at a time: `2 + S + 2E` sequential
+     * round-trips, which is where the whole import wall-clock goes. `onProgress`
+     * reports it in exercises written, the only unit that moves steadily.
+     */
+    import: async (sheets: ImportedSheet[], onProgress?: IOProgressFn): Promise<void> => {
       const userId = await getUserId();
       // Imported sheets land above the existing ones, keeping their own order.
       const baseOrder = (await topOrderIndex(userId)) - sheets.length + 1;
 
-      for (let si = 0; si < sheets.length; si++) {
-        const s = sheets[si];
+      const totalExercises = sheets.reduce((n, s) => n + s.exercises.length, 0);
+      let doneExercises = 0;
+      let doneSheets = 0;
 
-        const { data: sheetRow, error: sheetErr } = await supabase
-          .from("workout_sheets")
-          .insert({
-            user_id: userId,
-            name: s.name,
-            description: s.description ?? null,
-            order_index: baseOrder + si,
-          })
-          .select()
-          .single();
-        if (sheetErr) throw new Error(sheetErr.message);
+      // Sheets with no exercises still have to move the bar, hence the fallback.
+      const report = () => {
+        if (!onProgress) return;
+        const fraction =
+          totalExercises > 0
+            ? doneExercises / totalExercises
+            : sheets.length > 0
+              ? doneSheets / sheets.length
+              : 1;
+        onProgress({
+          phase: "writing",
+          ratio: phaseRatio(IMPORT_PHASE_WEIGHTS, "writing", fraction),
+          unit: { done: doneExercises, total: totalExercises, label: "exercises" },
+        });
+      };
 
-        for (let ei = 0; ei < s.exercises.length; ei++) {
-          const e = s.exercises[ei];
-          const { data: exRow, error: exErr } = await supabase
-            .from("exercises")
+      // Every insert below autocommits on its own. This is a best-effort
+      // client-side undo, NOT a transaction: a crash or a lost connection
+      // between the failure and the cleanup still leaves rows behind. The real
+      // fix is to move the whole import into a Postgres RPC so the database
+      // rolls it back for us.
+      const createdSheetIds: string[] = [];
+
+      try {
+        report();
+
+        for (let si = 0; si < sheets.length; si++) {
+          const s = sheets[si];
+
+          const { data: sheetRow, error: sheetErr } = await supabase
+            .from("workout_sheets")
             .insert({
-              sheet_id: sheetRow.id,
-              name: e.name,
-              notes: e.notes ?? null,
-              order_index: ei,
+              user_id: userId,
+              name: s.name,
+              description: s.description ?? null,
+              order_index: baseOrder + si,
             })
             .select()
             .single();
-          if (exErr) throw new Error(exErr.message);
+          if (sheetErr) throw new Error(sheetErr.message);
+          createdSheetIds.push(sheetRow.id);
 
-          if (e.sets.length > 0) {
-            const { error: setsErr } = await supabase.from("exercise_sets").insert(
-              e.sets.map((set) => ({
-                exercise_id: exRow.id,
-                set_number: set.setNumber,
-                reps: set.reps,
-                weight_kg: set.weightKg,
-                rest_time_sec: set.restTimeSec,
-              })),
+          for (let ei = 0; ei < s.exercises.length; ei++) {
+            const e = s.exercises[ei];
+            const { data: exRow, error: exErr } = await supabase
+              .from("exercises")
+              .insert({
+                sheet_id: sheetRow.id,
+                name: e.name,
+                notes: e.notes ?? null,
+                order_index: ei,
+              })
+              .select()
+              .single();
+            if (exErr) throw new Error(exErr.message);
+
+            if (e.sets.length > 0) {
+              const { error: setsErr } = await supabase.from("exercise_sets").insert(
+                e.sets.map((set) => ({
+                  exercise_id: exRow.id,
+                  set_number: set.setNumber,
+                  reps: set.reps,
+                  weight_kg: set.weightKg,
+                  rest_time_sec: set.restTimeSec,
+                })),
+              );
+              if (setsErr) throw new Error(setsErr.message);
+            }
+
+            doneExercises++;
+            report();
+          }
+
+          doneSheets++;
+          report();
+        }
+      } catch (err) {
+        if (createdSheetIds.length > 0) {
+          try {
+            // Deleting the sheet cascades to its exercises and sets.
+            await Promise.all(createdSheetIds.map((id) => api.sheets.delete(id)));
+          } catch {
+            const message = err instanceof Error ? err.message : "Import failed.";
+            throw new Error(
+              `${message} Cleaning up afterwards also failed: ${createdSheetIds.length} ` +
+                `partially imported sheet(s) were left in your account and have to be deleted manually.`,
             );
-            if (setsErr) throw new Error(setsErr.message);
           }
         }
+        throw err;
       }
+
+      onProgress?.({
+        phase: "done",
+        ratio: 1,
+        unit: { done: doneExercises, total: totalExercises, label: "exercises" },
+      });
     },
 
     /** Persists list order: first id = top (order_index 0). */
