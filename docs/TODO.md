@@ -11,6 +11,8 @@
 - [ ] **notifee is archived** – The background rest timer depends on `@notifee/react-native`, pinned to exactly `9.1.8` (2024-12-20, the last release: upstream `invertase/notifee` is archived on GitHub). This pins us to RN 0.76-era behaviour, `npx expo-doctor` flags it as `Unmaintained` so it is listed under `expo.doctor.reactNativeDirectoryCheck.exclude` in `apps/mobile/package.json` to keep CI honest about everything else, and it blocks the **New Architecture** item above — check notifee under the New Architecture, or find a replacement, before flipping `newArchEnabled: true`. See D009.
 - [ ] **Hardware back should leave selection mode** – On Android, pressing back while sheets are selected leaves the tab instead of clearing the selection. Needs a `BackHandler` listener; the app has none today.
 - [ ] **Bulk delete is not atomic** – `api.sheets.deleteMany` is a single `.in("id", ids)` delete, so it is atomic server-side today, but PostgREST puts the ids in the URL: past a few hundred sheets it will need chunking, and chunk 2 failing would leave chunk 1 deleted.
+- [ ] **Import is not atomic** – `api.sheets.import` runs `2 + S + 2E` sequential inserts with no transaction, so a failure part-way leaves rows behind; the client now deletes what it wrote, but a dropped connection defeats the cleanup too (the error message says how many sheets were left). Replace with a `security definer` Postgres RPC taking the payload as one `jsonb` argument and doing sheets → exercises → sets in one transaction. That makes it atomic *and* collapses hundreds of round-trips into one. Needs a migration in `supabase/schema.sql`; `ImportedSheet[]` is already the right payload shape.
+- [ ] **Export fan-out is unbounded** – `handleExport` fires `api.sheets.get()` for every sheet in one `Promise.all`, and each `get` is itself `1 + 1 + N` queries. Add a concurrency limit of about four before anyone has fifty sheets.
 
 
 ## BACKLOG
@@ -35,6 +37,9 @@
 - [x] **Bulk select and delete sheets** – Selection mode from the Home header, select all, and one delete for the lot; the cascaded sessions are dropped from the query cache too (v1.3.0).
 - [x] **Search sheets** – Filter Home by name or description, shown above five sheets; drag-to-reorder pauses while filtering because reorder rewrites `order_index` for exactly the ids it is given (v1.3.0).
 - [x] **Shared confirm dialog** – One promise-based `confirm()` / `notify()` in `src/lib/confirm.ts`, replacing the duplicated `Platform.OS === "web"` branches (v1.3.0).
+- [x] **Import / export progress** – A real progress bar both ways: the percentage follows completed round-trips under a per-phase weighting (writing is 90%), the file size is shown as a label, and the bar turns green when the work is actually done (v1.3.0).
+- [x] **Import size limit and rollback** – Imports are refused above 8 MB before the file is read, and a failed import deletes the sheets it had already written (v1.3.0).
+- [x] **Import / export busy-state bugs** – The web file picker resolves when dismissed instead of leaving the row disabled forever, export stops showing busy once the file is written rather than once the share sheet closes, and a blocked PDF pop-up reports an error instead of failing silently (v1.3.0).
 - [x] **Real Android notifications** – `expo-notifications` with a daily reminder and a monochrome status-bar icon (v1.2.0).
 - [x] **Resume an in-progress workout** – Cached locally and restored from the server, with Resume/Discard entry points and auto-close after 6h (v1.2.0).
 - [x] **Session notes** – Shown in the history detail and synced back to the sheet template on finish (v1.2.0).
