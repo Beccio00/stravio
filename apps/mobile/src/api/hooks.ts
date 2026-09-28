@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient, useQueries } from "@tanstack/react-query";
 import type { SessionDetailFull } from "@bhmt3wp/shared";
 import type { ImportedSheet } from "../lib/sheetsIO";
+import type { IOProgressFn } from "../lib/ioProgress";
 import { api } from "./client";
 import type {
   CreateWorkoutSheetInput,
@@ -56,7 +57,23 @@ export function useDeleteSheet() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.sheets.delete(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["sheets"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["sheets"] });
+      // The DB cascade removes the sheet's sessions too.
+      qc.invalidateQueries({ queryKey: ["sessions"] });
+    },
+  });
+}
+
+export function useDeleteSheets() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: string[]) => api.sheets.deleteMany(ids),
+    onSuccess: (_, ids) => {
+      qc.invalidateQueries({ queryKey: ["sheets"] });
+      ids.forEach((id) => qc.removeQueries({ queryKey: ["sheets", id] }));
+      qc.invalidateQueries({ queryKey: ["sessions"] });
+    },
   });
 }
 
@@ -71,8 +88,11 @@ export function useReorderSheets() {
 export function useImportSheets() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (sheets: ImportedSheet[]) => api.sheets.import(sheets),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["sheets"] }),
+    mutationFn: ({ sheets, onProgress }: { sheets: ImportedSheet[]; onProgress?: IOProgressFn }) =>
+      api.sheets.import(sheets, onProgress),
+    // onSettled, not onSuccess: a failed import can still have written some
+    // sheets before the rollback, and a failed rollback leaves them for good.
+    onSettled: () => qc.invalidateQueries({ queryKey: ["sheets"] }),
   });
 }
 
