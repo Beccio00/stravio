@@ -2,6 +2,27 @@
 
 All notable changes to Stravio.
 
+## [Unreleased]
+
+### Added
+- **Select several sheets at once**: a selection mode on Home with select all and one bulk delete
+- **Search sheets**: filter the Home list by name or description; reordering pauses while a search is active
+- **Import / export progress**: a progress bar for both directions, driven by the work actually done and labelled with the file size
+- **End-of-rest bell**: a sound when the rest timer runs out, on its own notification channel
+
+### Changed
+- Imports are capped at 8 MB and roll back the sheets they already wrote when a write fails
+
+### Fixed
+- The rest timer no longer freezes when the app goes to the background (#32); on Android an ongoing, silent notification shows a countdown the system keeps updating, and removes itself when the rest ends
+- Notifications are displayed while the app is in the foreground — the daily reminder used to be dropped silently
+- Deleting a sheet left its in-progress session in the cache, so the Home banner kept offering to resume a sheet that no longer existed
+- On web, closing the file picker without choosing anything left the Import row disabled until the screen was reloaded
+- Exporting on a phone kept showing "busy" until the share sheet was dismissed, rather than until the file was written
+- Exporting a PDF on web failed silently when pop-ups were blocked
+
+---
+
 ## [1.2.0] - 2026-09-23
 
 ### Added
