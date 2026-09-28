@@ -211,6 +211,12 @@ export const api = {
       if (error) throw new Error(error.message);
     },
 
+    deleteMany: async (ids: string[]): Promise<void> => {
+      if (ids.length === 0) return;
+      const { error } = await supabase.from("workout_sheets").delete().in("id", ids);
+      if (error) throw new Error(error.message);
+    },
+
     duplicate: async (sourceId: string): Promise<WorkoutSheet> => {
       const userId = await getUserId();
       const source = await api.sheets.get(sourceId);
