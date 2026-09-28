@@ -6,29 +6,26 @@ has shipped.
 
 ## In flight — v1.3.0
 
-Four branches off `dev`, all independent, each with its own pull request. None of
-them bumps the version: the bump to `1.3.0` happens in a separate release PR once
-all four are merged and tested.
+Everything is merged into `dev` (#51 selection and search, #52 import/export
+progress, #53 the background timer, #54 these docs). What is left is the release
+itself: bump `apps/mobile/app.json` to `1.3.0`, turn the `[Unreleased]` section of
+the changelog into `[1.3.0]`, merge `dev` into `main`, tag `v1.3.0`, then deploy
+the web with `npx vercel --prod` and build the AAB.
 
-| Branch | PR | Verified on |
-|---|---|---|
-| `feat/home-select-and-search` | #51 | web `:8081`, Expo Go |
-| `feat/io-progress` | #52 | web `:8081`, Expo Go |
-| `fix/background-timer` | #53 | **preview APK only** — notifee is absent from Expo Go |
-| `docs/refresh` | #54 | n/a |
+Issue #32 stays open until `dev` reaches `main`: GitHub only auto-closes on the
+default branch, and the fix genuinely is not in production yet.
 
-### What still needs a human with a device
+### Verified, and by whom
 
-`fix/background-timer` is the only branch whose behaviour cannot be observed
-without `eas build --platform android --profile preview`. Nobody has yet seen:
-the chronometer counting down on the lock screen, `timeoutAfter` removing the
-ongoing notification at zero, the bell firing on time under Doze, or the LOW
-channel producing no banner and no vibration.
+The rest timer was checked on a preview APK on a real phone: the countdown
+survives backgrounding, the ongoing notification counts down silently and clears
+itself, and the bell rings. Selection, search and the progress bars were checked
+on web and in Expo Go.
 
-Two smaller things were also never exercised at runtime: the web file-picker
-cancel fix in `feat/io-progress` (event ordering between `cancel` and `focus`
-varies by browser — open the picker and press Escape) and the import rollback,
-which needs the network to drop part-way through a write.
+Two paths were never exercised and are worth a look the next time someone is in
+there: the import rollback (it needs the network to drop part-way through a
+write) and the web file-picker cancel fix in Safari specifically, where the
+`cancel` event support is the newest.
 
 ## Decisions that are easy to get wrong later
 
