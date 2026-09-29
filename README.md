@@ -57,7 +57,7 @@ This v1 intentionally keeps the product model simple:
 
 ## Download
 
-- **Android (v1.2.0)** — [install the APK](https://expo.dev/accounts/stravio/projects/stravio/builds/58c04459-598c-42ae-b775-e641330cd8ac) from the Expo build page (tap *Install* on the phone, or scan the QR code).
+- **Android (v1.3.0)** — [install the APK](https://expo.dev/accounts/stravio/projects/stravio/builds/badb3358-cc9b-4b20-86f3-58f6f8281e55) from the Expo build page (tap *Install* on the phone, or scan the QR code).
 - **Web** — <https://stravio-project.vercel.app/>
 
 Every build is listed on the [Expo dashboard](https://expo.dev/accounts/stravio/projects/stravio/builds).
