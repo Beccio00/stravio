@@ -4,28 +4,17 @@ Short-lived working notes: what is in flight right now, and the context that is
 not recoverable from the code or the git history. Delete a section once its work
 has shipped.
 
-## In flight — v1.3.0
+## Shipped — v1.3.0 (2026-09-29)
 
-Everything is merged into `dev` (#51 selection and search, #52 import/export
-progress, #53 the background timer, #54 these docs). What is left is the release
-itself: bump `apps/mobile/app.json` to `1.3.0`, turn the `[Unreleased]` section of
-the changelog into `[1.3.0]`, merge `dev` into `main`, tag `v1.3.0`, then deploy
-the web with `npx vercel --prod` and build the AAB.
-
-Issue #32 stays open until `dev` reaches `main`: GitHub only auto-closes on the
-default branch, and the fix genuinely is not in production yet.
-
-### Verified, and by whom
-
-The rest timer was checked on a preview APK on a real phone: the countdown
-survives backgrounding, the ongoing notification counts down silently and clears
-itself, and the bell rings. Selection, search and the progress bars were checked
-on web and in Expo Go.
+Selection and search on Home (#51), import/export progress (#52), the background
+rest timer (#53) and a documentation refresh (#54). All four were checked on web,
+in Expo Go and on a preview APK built from the merged `dev`, then released
+together.
 
 Two paths were never exercised and are worth a look the next time someone is in
 there: the import rollback (it needs the network to drop part-way through a
-write) and the web file-picker cancel fix in Safari specifically, where the
-`cancel` event support is the newest.
+write) and the web file-picker cancel fix in Safari specifically, where support
+for the `cancel` event is newest.
 
 ## Decisions that are easy to get wrong later
 
