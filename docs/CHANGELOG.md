@@ -2,7 +2,7 @@
 
 All notable changes to Stravio.
 
-## [Unreleased]
+## [1.3.0] - 2026-09-29
 
 ### Added
 - **Select several sheets at once**: a selection mode on Home with select all and one bulk delete
