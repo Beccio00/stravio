@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Alert, Platform, ScrollView, Switch, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Constants from "expo-constants";
@@ -18,7 +18,7 @@ import {
   Upload,
   User,
 } from "lucide-react-native";
-import { Card, ICON_STROKE, ScreenHeader, StateBlock } from "../../../src/components/ui";
+import { Card, ICON_STROKE, ProgressBar, ScreenHeader, StateBlock } from "../../../src/components/ui";
 import { useAuth } from "../../../src/contexts/AuthContext";
 import { usePreferences, type ThemePreference } from "../../../src/contexts/PreferencesContext";
 import * as notifications from "../../../src/lib/notifications";
@@ -26,6 +26,14 @@ import { prefs } from "../../../src/lib/preferences";
 import { useImportSheets, useSheets } from "../../../src/api/hooks";
 import { api } from "../../../src/api/client";
 import { exportCSV, exportJSON, exportPDF, pickAndParseFile } from "../../../src/lib/sheetsIO";
+import {
+  EXPORT_PHASE_WEIGHTS,
+  formatBytes,
+  phaseRatio,
+  type IOPhase,
+  type IOProgress,
+  type IOProgressFn,
+} from "../../../src/lib/ioProgress";
 import type { WorkoutSheetFull } from "@bhmt3wp/shared";
 
 type ThemeOption = {
@@ -42,6 +50,11 @@ const THEME_OPTIONS: ThemeOption[] = [
 
 const REST_OPTIONS = [30, 45, 60, 90, 120];
 
+type ExportFormat = "json" | "csv" | "pdf";
+
+/** A stopped bar at 2% is invisible; keep a sliver of red so the failure reads. */
+const MIN_ERROR_RATIO = 0.06;
+
 function ActionRow({
   icon: Icon,
   label,
@@ -49,6 +62,7 @@ function ActionRow({
   onPress,
   disabled = false,
   color = "#60a5fa",
+  accessory,
 }: {
   icon: LucideIcon;
   label: string;
@@ -56,25 +70,88 @@ function ActionRow({
   onPress: () => void;
   disabled?: boolean;
   color?: string;
+  /** Rendered below the row, outside the touchable so it keeps full opacity. */
+  accessory?: ReactNode;
 }) {
   return (
-    <TouchableOpacity
-      onPress={onPress}
-      disabled={disabled}
-      activeOpacity={0.75}
-      accessibilityRole="button"
-      className={disabled ? "opacity-50" : ""}
-    >
-      <View className="flex-row items-center py-3">
-        <View className="mr-3 h-8 w-8 items-center justify-center rounded-xl bg-action-secondary border border-border">
-          <Icon size={16} strokeWidth={ICON_STROKE} color={color} />
+    <View>
+      <TouchableOpacity
+        onPress={onPress}
+        disabled={disabled}
+        activeOpacity={0.75}
+        accessibilityRole="button"
+        className={disabled ? "opacity-50" : ""}
+      >
+        <View className="flex-row items-center py-3">
+          <View className="mr-3 h-8 w-8 items-center justify-center rounded-xl bg-action-secondary border border-border">
+            <Icon size={16} strokeWidth={ICON_STROKE} color={color} />
+          </View>
+          <View className="flex-1">
+            <Text className="text-text-primary text-base font-semibold">{label}</Text>
+            <Text className="text-text-secondary text-sm mt-0.5">{description}</Text>
+          </View>
         </View>
-        <View className="flex-1">
-          <Text className="text-text-primary text-base font-semibold">{label}</Text>
-          <Text className="text-text-secondary text-sm mt-0.5">{description}</Text>
-        </View>
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+      {accessory ? <View className="pb-3">{accessory}</View> : null}
+    </View>
+  );
+}
+
+const IMPORT_PHASE_LABEL: Partial<Record<IOPhase, string>> = {
+  picking: "Waiting for a file…",
+  reading: "Reading file…",
+  parsing: "Reading file…",
+  writing: "Importing sheets…",
+  sharing: "Importing sheets…",
+  done: "Import complete",
+  error: "Import failed",
+};
+
+const EXPORT_PHASE_LABEL: Partial<Record<IOPhase, string>> = {
+  picking: "Preparing…",
+  reading: "Loading sheets…",
+  parsing: "Building file…",
+  writing: "Saving file…",
+  sharing: "File ready — choose where to send it",
+  done: "Export complete",
+  error: "Export failed",
+};
+
+/**
+ * The bar tracks work units, not bytes: the percentage comes from sheets
+ * fetched or exercises written, and the file size is shown as a plain label.
+ */
+function IOProgressBlock({
+  progress,
+  labels,
+}: {
+  progress: IOProgress;
+  labels: Partial<Record<IOPhase, string>>;
+}) {
+  const tone =
+    progress.phase === "error"
+      ? "error"
+      : progress.phase === "done" || progress.phase === "sharing"
+        ? "done"
+        : "progress";
+
+  const detail = [
+    progress.bytes !== undefined ? formatBytes(progress.bytes) : null,
+    progress.unit && progress.unit.total > 0
+      ? `${progress.unit.done} / ${progress.unit.total} ${progress.unit.label}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <View>
+      <ProgressBar ratio={progress.ratio} tone={tone} />
+      <Text className="text-text-secondary text-xs mt-2">
+        {progress.message ?? labels[progress.phase] ?? "Working…"}
+      </Text>
+      {detail ? <Text className="text-text-muted text-xs mt-0.5">{detail}</Text> : null}
+    </View>
   );
 }
 
@@ -117,6 +194,9 @@ export default function SettingsScreen() {
   const importSheets = useImportSheets();
   const [exportBusy, setExportBusy] = useState(false);
   const [importBusy, setImportBusy] = useState(false);
+  const [importProgress, setImportProgress] = useState<IOProgress | null>(null);
+  const [exportProgress, setExportProgress] = useState<IOProgress | null>(null);
+  const [exportFormat, setExportFormat] = useState<ExportFormat | null>(null);
   const [enabled, setEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
   const [restEnabled, setRestEnabled] = useState(true);
@@ -145,49 +225,109 @@ export default function SettingsScreen() {
     await prefs.restDefaultSec.set(sec);
   };
 
-  const handleExport = async (format: "json" | "csv" | "pdf") => {
-    if (exportBusy) return;
-    setExportBusy(true);
-    try {
-      const full: WorkoutSheetFull[] = sheets?.length
-        ? await Promise.all(sheets.map((s) => api.sheets.get(s.id)))
-        : [];
-      if (full.length === 0) {
-        notify("Nothing to export", "Create at least one sheet before exporting.");
-        return;
-      }
-      if (format === "json") await exportJSON(full);
-      else if (format === "csv") await exportCSV(full);
-      else await exportPDF(full);
-    } catch (err) {
-      notify("Export error", err instanceof Error ? err.message : "Export failed.");
-    } finally {
-      setExportBusy(false);
-    }
-  };
+  const handleExport = useCallback(
+    async (format: ExportFormat) => {
+      if (exportBusy) return;
+      setExportBusy(true);
+      setExportFormat(format);
+      // One operation at a time owns the feedback area.
+      setImportProgress(null);
 
-  const handleImport = async () => {
+      const total = sheets?.length ?? 0;
+      const onProgress: IOProgressFn = (p) =>
+        setExportProgress((prev) => ({ ...p, bytes: p.bytes ?? prev?.bytes }));
+      onProgress({
+        phase: "reading",
+        ratio: 0,
+        unit: { done: 0, total, label: "sheets" },
+      });
+
+      try {
+        // Fetching stays parallel — it is only the counter that is sequential.
+        // Each `api.sheets.get` is its own round-trip, so this is the slow phase.
+        let done = 0;
+        const full: WorkoutSheetFull[] = sheets?.length
+          ? await Promise.all(
+              sheets.map(async (s) => {
+                const sheet = await api.sheets.get(s.id);
+                done++;
+                onProgress({
+                  phase: "reading",
+                  ratio: phaseRatio(EXPORT_PHASE_WEIGHTS, "reading", done / total),
+                  unit: { done, total, label: "sheets" },
+                });
+                return sheet;
+              }),
+            )
+          : [];
+
+        if (full.length === 0) {
+          setExportProgress(null);
+          setExportFormat(null);
+          notify("Nothing to export", "Create at least one sheet before exporting.");
+          return;
+        }
+
+        if (format === "json") await exportJSON(full, onProgress);
+        else if (format === "csv") await exportCSV(full, onProgress);
+        else await exportPDF(full, onProgress);
+      } catch (err) {
+        setExportProgress((prev) => ({
+          phase: "error",
+          ratio: Math.max(prev?.ratio ?? 0, MIN_ERROR_RATIO),
+          bytes: prev?.bytes,
+          unit: prev?.unit,
+        }));
+        notify("Export error", err instanceof Error ? err.message : "Export failed.");
+      } finally {
+        setExportBusy(false);
+      }
+    },
+    [exportBusy, sheets],
+  );
+
+  const handleImport = useCallback(async () => {
     if (importBusy) return;
     setImportBusy(true);
+    setImportProgress(null);
+    setExportProgress(null);
+    setExportFormat(null);
+
+    // The byte count arrives once, early; carry it through every later tick.
+    const onProgress: IOProgressFn = (p) =>
+      setImportProgress((prev) => ({ ...p, bytes: p.bytes ?? prev?.bytes }));
+
     try {
-      const parsed = await pickAndParseFile();
-      if (!parsed) return; // cancelled
+      const parsed = await pickAndParseFile(onProgress);
+      if (!parsed) {
+        setImportProgress(null);
+        return; // cancelled
+      }
 
       const noun = parsed.length === 1 ? "sheet" : "sheets";
       const confirmed = await confirmImport(
         `Import ${parsed.length} ${noun}?`,
         `"${parsed.map((s) => s.name).join('", "')}" will be added to your sheets. Existing sheets are not modified.`,
       );
-      if (!confirmed) return;
+      if (!confirmed) {
+        setImportProgress(null);
+        return;
+      }
 
-      await importSheets.mutateAsync(parsed);
+      await importSheets.mutateAsync({ sheets: parsed, onProgress });
       notify("Import complete", `${parsed.length} ${noun} imported.`);
     } catch (err) {
+      setImportProgress((prev) => ({
+        phase: "error",
+        ratio: Math.max(prev?.ratio ?? 0, MIN_ERROR_RATIO),
+        bytes: prev?.bytes,
+        unit: prev?.unit,
+      }));
       notify("Import error", err instanceof Error ? err.message : "Import failed.");
     } finally {
       setImportBusy(false);
     }
-  };
+  }, [importBusy, importSheets]);
 
   const handleToggle = async (value: boolean) => {
     setEnabled(value);
@@ -202,6 +342,11 @@ export default function SettingsScreen() {
       setEnabled(!value);
     }
   };
+
+  const exportAccessory = (format: ExportFormat) =>
+    exportProgress && exportFormat === format ? (
+      <IOProgressBlock progress={exportProgress} labels={EXPORT_PHASE_LABEL} />
+    ) : null;
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
@@ -344,6 +489,7 @@ export default function SettingsScreen() {
             onPress={() => handleExport("json")}
             disabled={exportBusy}
             color="#a78bfa"
+            accessory={exportAccessory("json")}
           />
           <Divider />
           <ActionRow
@@ -353,6 +499,7 @@ export default function SettingsScreen() {
             onPress={() => handleExport("csv")}
             disabled={exportBusy}
             color="#34d399"
+            accessory={exportAccessory("csv")}
           />
           <Divider />
           <ActionRow
@@ -362,6 +509,7 @@ export default function SettingsScreen() {
             onPress={() => handleExport("pdf")}
             disabled={exportBusy}
             color="#f87171"
+            accessory={exportAccessory("pdf")}
           />
         </Card>
 
@@ -376,6 +524,13 @@ export default function SettingsScreen() {
             onPress={handleImport}
             disabled={importBusy}
             color="#fb923c"
+            accessory={
+              // The picker is already "busy" but nothing is happening yet: no bar
+              // until real work starts.
+              importProgress && importProgress.phase !== "picking" ? (
+                <IOProgressBlock progress={importProgress} labels={IMPORT_PHASE_LABEL} />
+              ) : null
+            }
           />
         </Card>
         <Text className="text-text-muted text-xs mt-3 px-1 leading-5">
