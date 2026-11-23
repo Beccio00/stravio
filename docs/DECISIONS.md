@@ -159,6 +159,27 @@ Role is kept in schema to avoid breaking existing data and to support future mul
 
 ---
 
+## D010: Soft delete for sheets and exercises
+
+**Date**: 2026-11-21
+**Status**: Active
+
+**Context**: `workout_sessions.sheet_id` and `session_set_logs.exercise_id` / `session_exercise_notes.exercise_id` were `on delete cascade`. Deleting a sheet therefore deleted every session ever done with it, and removing one exercise from a sheet deleted every logged set of that exercise. A sheet is a *template*; the history is a record of what actually happened, and must outlive the template.
+
+**Decision**: Sheets and exercises get a nullable `deleted_at`. The app never hard-deletes them: `api.sheets.delete` / `deleteMany` / `api.exercises.delete` stamp `deleted_at`, and every template query (`sheets.list`, `sheets.get` exercises, `exercises.listBySheet`, `topOrderIndex`, the note copy in `sessions.create`) filters `deleted_at is null`. History queries deliberately do not filter, so a past session still shows the real sheet and exercise names. An in-progress session of a deleted sheet is closed on the spot (completed if it has sets, dropped if empty). The history → template foreign keys become `on delete no action deferrable initially deferred`, so a hard delete that would orphan history fails instead of cascading; deferral lets an auth-user deletion pass, because by commit its own cascade has removed sessions and logs too. Migration: `supabase/migration_soft_delete_sheets.sql`.
+
+**Pros**:
+- History is never lost by editing templates, and keeps its original names.
+- The database enforces it: a future hard delete cannot silently wipe history.
+- RLS policies are unchanged; the deleted rows are still the user's own rows.
+
+**Cons**:
+- Every new template query has to remember `.is("deleted_at", null)`.
+- Deleted sheets and exercises stay in the database for good (tiny rows).
+- Sheets deleted before the migration are already gone, with their history.
+
+---
+
 ## Future Decisions (TODO)
 
 - **PowerSync**: Offline-first sync between local SQLite and Supabase

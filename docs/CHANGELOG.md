@@ -2,6 +2,13 @@
 
 All notable changes to Stravio.
 
+## [Unreleased]
+
+### Fixed
+- Deleting a sheet deleted its whole workout history, and deleting an exercise deleted every set ever logged for it. Sheets and exercises are now soft-deleted and the history keeps them, names included (D010). **Requires** running `supabase/migration_soft_delete_sheets.sql`.
+
+---
+
 ## [1.3.0] - 2026-09-29
 
 ### Added

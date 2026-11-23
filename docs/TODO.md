@@ -34,7 +34,7 @@
 
 ## Done
 
-- [x] **Bulk select and delete sheets** – Selection mode from the Home header, select all, and one delete for the lot; the cascaded sessions are dropped from the query cache too (v1.3.0).
+- [x] **Bulk select and delete sheets** – Selection mode from the Home header, select all, and one delete for the lot (v1.3.0). Since D010 the delete is soft and the sheets' history is kept.
 - [x] **Search sheets** – Filter Home by name or description, shown above five sheets; drag-to-reorder pauses while filtering because reorder rewrites `order_index` for exactly the ids it is given (v1.3.0).
 - [x] **Shared confirm dialog** – One promise-based `confirm()` / `notify()` in `src/lib/confirm.ts`, replacing the duplicated `Platform.OS === "web"` branches (v1.3.0).
 - [x] **Import / export progress** – A real progress bar both ways: the percentage follows completed round-trips under a per-phase weighting (writing is 90%), the file size is shown as a label, and the bar turns green when the work is actually done (v1.3.0).
