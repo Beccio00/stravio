@@ -59,7 +59,7 @@ export function useDeleteSheet() {
     mutationFn: (id: string) => api.sheets.delete(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["sheets"] });
-      // The DB cascade removes the sheet's sessions too.
+      // History is kept, but an in-progress session of the sheet is closed.
       qc.invalidateQueries({ queryKey: ["sessions"] });
     },
   });

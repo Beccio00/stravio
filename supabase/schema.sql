@@ -48,6 +48,8 @@ create table if not exists public.workout_sheets (
   name        text not null,
   description text,
   order_index integer not null default 0,
+  -- Soft delete: history keeps pointing at deleted sheets (see D010).
+  deleted_at  timestamptz,
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );
@@ -61,6 +63,8 @@ create table if not exists public.exercises (
   name        text not null,
   notes       text,
   order_index integer not null default 0,
+  -- Soft delete: history keeps pointing at deleted exercises (see D010).
+  deleted_at  timestamptz,
   created_at  timestamptz not null default now()
 );
 
@@ -82,7 +86,10 @@ create table if not exists public.exercise_sets (
 create table if not exists public.workout_sessions (
   id           uuid primary key default gen_random_uuid(),
   user_id      uuid not null references auth.users(id) on delete cascade,
-  sheet_id     uuid not null references public.workout_sheets(id) on delete cascade,
+  -- No cascade: deleting a sheet must never delete its history. Deferred so
+  -- that deleting an auth user (which cascades to both) passes at commit.
+  sheet_id     uuid not null references public.workout_sheets(id)
+                 on delete no action deferrable initially deferred,
   started_at   timestamptz not null default now(),
   completed_at timestamptz,
   notes        text
@@ -94,7 +101,8 @@ create table if not exists public.workout_sessions (
 create table if not exists public.session_set_logs (
   id           uuid primary key default gen_random_uuid(),
   session_id   uuid not null references public.workout_sessions(id) on delete cascade,
-  exercise_id  uuid not null references public.exercises(id) on delete cascade,
+  exercise_id  uuid not null references public.exercises(id)
+                 on delete no action deferrable initially deferred,
   set_number   integer not null,
   reps         integer not null,
   weight_kg    double precision not null,
@@ -107,7 +115,8 @@ create table if not exists public.session_set_logs (
 create table if not exists public.session_exercise_notes (
   id           uuid primary key default gen_random_uuid(),
   session_id   uuid not null references public.workout_sessions(id) on delete cascade,
-  exercise_id  uuid not null references public.exercises(id) on delete cascade,
+  exercise_id  uuid not null references public.exercises(id)
+                 on delete no action deferrable initially deferred,
   notes        text not null,
   updated_at   timestamptz not null default now()
 );

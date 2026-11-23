@@ -142,7 +142,7 @@ export default function SheetDetailScreen() {
 
   const handleDeleteExercise = (exerciseId: string, name: string) => {
     const title = "Delete exercise";
-    const message = `Delete \"${name}\" from this sheet?`;
+    const message = `Delete \"${name}\" from this sheet? Its past sets stay in your history.`;
 
     if (Platform.OS === "web") {
       if (window.confirm(`${title}\n\n${message}`)) {

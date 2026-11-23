@@ -117,6 +117,7 @@ async function topOrderIndex(userId: string): Promise<number> {
     .from("workout_sheets")
     .select("order_index")
     .eq("user_id", userId)
+    .is("deleted_at", null)
     .order("order_index", { ascending: true })
     .limit(1);
   if (error) throw new Error(error.message);
@@ -125,6 +126,31 @@ async function topOrderIndex(userId: string): Promise<number> {
 
 /** An in-progress session untouched for this long is closed automatically. */
 export const STALE_SESSION_HOURS = 6;
+
+/**
+ * Sheets and exercises are soft-deleted: the row stays, stamped with
+ * `deleted_at`, and every template query filters it out. Workout history points
+ * at these rows, so a hard delete would take the history with it (D010).
+ *
+ * An in-progress session of a deleted sheet is closed straight away, the same
+ * way a stale one is, so Home stops offering to resume it.
+ */
+async function softDeleteSheets(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const { error } = await supabase
+    .from("workout_sheets")
+    .update({ deleted_at: new Date().toISOString() })
+    .in("id", ids);
+  if (error) throw new Error(error.message);
+
+  const { data: open, error: openErr } = await supabase
+    .from("workout_sessions")
+    .select("id")
+    .in("sheet_id", ids)
+    .is("completed_at", null);
+  if (openErr) throw new Error(openErr.message);
+  for (const row of open ?? []) await api.sessions.close(row.id);
+}
 
 // ---------------------------------------------------------------------------
 // API implementation
@@ -136,6 +162,7 @@ export const api = {
       const { data, error } = await supabase
         .from("workout_sheets")
         .select("*")
+        .is("deleted_at", null)
         .order("order_index", { ascending: true })
         .order("created_at", { ascending: false });
       if (error) throw new Error(error.message);
@@ -154,6 +181,7 @@ export const api = {
         .from("exercises")
         .select("*")
         .eq("sheet_id", id)
+        .is("deleted_at", null)
         .order("order_index");
 
       const exercises: ExerciseFull[] = await Promise.all(
@@ -207,16 +235,10 @@ export const api = {
       return mapSheet(result);
     },
 
-    delete: async (id: string): Promise<void> => {
-      const { error } = await supabase.from("workout_sheets").delete().eq("id", id);
-      if (error) throw new Error(error.message);
-    },
+    /** Soft delete: the sheet disappears from the list, its history stays. */
+    delete: (id: string): Promise<void> => softDeleteSheets([id]),
 
-    deleteMany: async (ids: string[]): Promise<void> => {
-      if (ids.length === 0) return;
-      const { error } = await supabase.from("workout_sheets").delete().in("id", ids);
-      if (error) throw new Error(error.message);
-    },
+    deleteMany: (ids: string[]): Promise<void> => softDeleteSheets(ids),
 
     duplicate: async (sourceId: string): Promise<WorkoutSheet> => {
       const userId = await getUserId();
@@ -360,8 +382,13 @@ export const api = {
       } catch (err) {
         if (createdSheetIds.length > 0) {
           try {
-            // Deleting the sheet cascades to its exercises and sets.
-            await Promise.all(createdSheetIds.map((id) => api.sheets.delete(id)));
+            // A real delete, not the soft one: these sheets were created a
+            // moment ago and have no history. It cascades to exercises and sets.
+            const { error: cleanupErr } = await supabase
+              .from("workout_sheets")
+              .delete()
+              .in("id", createdSheetIds);
+            if (cleanupErr) throw new Error(cleanupErr.message);
           } catch {
             const message = err instanceof Error ? err.message : "Import failed.";
             throw new Error(
@@ -399,6 +426,7 @@ export const api = {
         .from("exercises")
         .select("*")
         .eq("sheet_id", sheetId)
+        .is("deleted_at", null)
         .order("order_index");
       if (error) throw new Error(error.message);
       return (data ?? []).map(mapExercise);
@@ -435,8 +463,12 @@ export const api = {
       return mapExercise(result);
     },
 
+    /** Soft delete, like sheets: past logs of this exercise stay in the history. */
     delete: async (id: string): Promise<void> => {
-      const { error } = await supabase.from("exercises").delete().eq("id", id);
+      const { error } = await supabase
+        .from("exercises")
+        .update({ deleted_at: new Date().toISOString() })
+        .eq("id", id);
       if (error) throw new Error(error.message);
     },
 
@@ -650,7 +682,8 @@ export const api = {
       const { data: exs } = await supabase
         .from("exercises")
         .select("id, notes")
-        .eq("sheet_id", data.sheetId);
+        .eq("sheet_id", data.sheetId)
+        .is("deleted_at", null);
 
       const notesToInsert = (exs ?? [])
         .filter((ex: any) => ex.notes && ex.notes.trim())
@@ -669,11 +702,13 @@ export const api = {
 
     /** Ends an abandoned session: completed if it has logged sets, deleted if empty. */
     close: async (id: string): Promise<void> => {
-      const { count } = await supabase
+      const { count, error } = await supabase
         .from("session_set_logs")
         .select("id", { count: "exact", head: true })
         .eq("session_id", id);
-      if (count && count > 0) {
+      // A failed count must not read as "empty": that branch deletes the session.
+      if (error || count === null) throw new Error(error?.message ?? "Could not count logged sets.");
+      if (count > 0) {
         await api.sessions.complete(id);
       } else {
         await api.sessions.delete(id);

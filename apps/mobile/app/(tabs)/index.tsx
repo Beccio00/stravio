@@ -113,7 +113,7 @@ export default function HomeScreen() {
   const handleDelete = async (id: string, name: string) => {
     const ok = await confirm({
       title: "Delete sheet",
-      message: `Delete "${name}"? This cannot be undone.`,
+      message: `Delete "${name}"? This cannot be undone. Your workout history is kept.`,
       confirmLabel: "Delete",
       destructive: true,
     });
@@ -158,8 +158,8 @@ export default function HomeScreen() {
       title: `Delete ${targets.length} ${targets.length === 1 ? "sheet" : "sheets"}`,
       message:
         targets.length <= 5
-          ? `Delete ${targets.map((s) => `"${s.name}"`).join(", ")}? This cannot be undone.`
-          : `Delete ${targets.length} sheets? This cannot be undone.`,
+          ? `Delete ${targets.map((s) => `"${s.name}"`).join(", ")}? This cannot be undone. Your workout history is kept.`
+          : `Delete ${targets.length} sheets? This cannot be undone. Your workout history is kept.`,
       confirmLabel: "Delete",
       destructive: true,
     });
